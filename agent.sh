@@ -17,6 +17,13 @@
 
 set -euo pipefail
 
+# ── Variables d'environnement ──────────────────────────────────────
+if [ -f "$HOME/.env-recap" ]; then
+  set -a
+  source "$HOME/.env-recap"
+  set +a
+fi
+
 # ── Configuration ─────────────────────────────────────────────────
 REPO="aerthur/game-the-door-beneath"
 REPO_DIR="/home/claude/game-the-door-beneath"
