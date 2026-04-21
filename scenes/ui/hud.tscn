@@ -180,4 +180,17 @@ horizontal_alignment = 1
 [node name="Restart" type="Button" parent="GameOver/Panel/VBox"]
 text = "Recommencer"
 
+[node name="VersionLabel" type="Label" parent="."]
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -100.0
+offset_top = -22.0
+offset_right = -4.0
+offset_bottom = -4.0
+text = "v0.1.0"
+horizontal_alignment = 2
+
 [connection signal="pressed" from="GameOver/Panel/VBox/Restart" to="HUD" method="_on_restart_pressed"]
