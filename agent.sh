@@ -94,23 +94,64 @@ process_issue() {
     git checkout "$MAIN_BRANCH"
     git pull --ff-only origin "$MAIN_BRANCH"
 
-    log "Recherche d'une issue [F] non assignée..."
-    ISSUE_JSON=$(gh issue list \
+    log "Recherche d'une issue [F] non assignée (avec vérification des dépendances)..."
+
+    # Récupère jusqu'à 20 issues pour pouvoir trier par dépendances
+    ALL_ISSUES=$(gh issue list \
       --repo "$REPO" \
       --state open \
       --search "[F] in:title no:assignee" \
-      --limit 1 \
+      --limit 20 \
       --json number,title,body \
       2>/dev/null || echo "[]")
 
-    if [ "$ISSUE_JSON" = "[]" ] || [ -z "$ISSUE_JSON" ]; then
+    if [ "$ALL_ISSUES" = "[]" ] || [ -z "$ALL_ISSUES" ]; then
       log "Aucune issue disponible."
       return 3
     fi
 
-    ISSUE_NUM=$(echo "$ISSUE_JSON" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d[0]['number'])")
-    ISSUE_TITLE=$(echo "$ISSUE_JSON" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d[0]['title'])")
-    ISSUE_BODY=$(echo "$ISSUE_JSON" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d[0]['body'] or '')")
+    # Trouver la première issue dont toutes les dépendances sont mergées
+    SELECTED=""
+    COUNT=$(echo "$ALL_ISSUES" | python3 -c "import sys,json; print(len(json.load(sys.stdin)))")
+
+    for i in $(seq 0 $((COUNT - 1))); do
+      CANDIDATE_NUM=$(echo "$ALL_ISSUES" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d[$i]['number'])")
+      CANDIDATE_TITLE=$(echo "$ALL_ISSUES" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d[$i]['title'])")
+      CANDIDATE_BODY=$(echo "$ALL_ISSUES" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d[$i]['body'] or '')")
+
+      # Extraire les dépendances (format : "Depends-on: #12" ou "Depends-on: #12, #15")
+      DEPS=$(echo "$CANDIDATE_BODY" | grep -oiP '(?<=depends-on:)[^\n]+' | tr ',' '\n' | grep -oP '\d+' || echo "")
+
+      DEPS_OK=true
+      for DEP_NUM in $DEPS; do
+        # Vérifier si une PR qui ferme cette issue est mergée
+        DEP_PR_MERGED=$(gh pr list \
+          --repo "$REPO" \
+          --state merged \
+          --search "closes #${DEP_NUM}" \
+          --json number \
+          -q '.[0].number' 2>/dev/null || echo "")
+
+        if [ -z "$DEP_PR_MERGED" ]; then
+          log "Issue #$CANDIDATE_NUM bloquée par #$DEP_NUM (non mergée)"
+          DEPS_OK=false
+          break
+        fi
+      done
+
+      if [ "$DEPS_OK" = true ]; then
+        SELECTED="$i"
+        ISSUE_NUM="$CANDIDATE_NUM"
+        ISSUE_TITLE="$CANDIDATE_TITLE"
+        ISSUE_BODY="$CANDIDATE_BODY"
+        break
+      fi
+    done
+
+    if [ -z "$SELECTED" ]; then
+      log "Toutes les issues disponibles sont bloquées par des dépendances non mergées."
+      return 3
+    fi
 
     SLUG=$(echo "$ISSUE_TITLE" \
       | tr '[:upper:]' '[:lower:]' \
@@ -121,7 +162,7 @@ process_issue() {
       | cut -c1-40)
     BRANCH="feature/${ISSUE_NUM}-${SLUG}"
 
-    log "Issue #$ISSUE_NUM — $ISSUE_TITLE"
+    log "Issue sélectionnée : #$ISSUE_NUM — $ISSUE_TITLE"
     gh issue edit "$ISSUE_NUM" --repo "$REPO" --add-assignee "@me"
     gh issue comment "$ISSUE_NUM" --repo "$REPO" \
       --body "🤖 Agent Claude Code a pris en charge cette issue. Implémentation en cours..."
