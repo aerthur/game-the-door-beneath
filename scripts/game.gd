@@ -1,4 +1,5 @@
 extends Node
+# Dernière mise à jour : 2026-04-21
 
 # ── Grille ───────────────────────────────────────────────────────
 const LANES    = 5
