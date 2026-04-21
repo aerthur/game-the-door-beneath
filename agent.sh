@@ -159,6 +159,8 @@ gh issue comment "$ISSUE_NUM" --repo "$REPO" \
 
 Le code est prêt pour review. Tester dans Godot 4.6 puis merger si tout va bien."
 
+# Créer le label s'il n'existe pas, puis l'appliquer
+gh label create "agent-done" --repo "$REPO" --color "0075ca" --description "Traité par agent Claude Code" 2>/dev/null || true
 gh issue edit "$ISSUE_NUM" --repo "$REPO" --add-label "agent-done"
 
 log "Done. Issue #$ISSUE_NUM traitée → $PR_URL"
