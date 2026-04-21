@@ -18,7 +18,7 @@ set -euo pipefail
 
 # ── Configuration ─────────────────────────────────────────────────
 REPO="aerthur/game-the-door-beneath"
-REPO_DIR="/chemin/vers/game-the-door-beneath"  # ← à changer (chemin où tu as cloné le repo)
+REPO_DIR="/home/claude/game-the-door-beneath"
 MAIN_BRANCH="main"
 LOG_PREFIX="[$(date '+%Y-%m-%d %H:%M:%S')] [agent]"
 
