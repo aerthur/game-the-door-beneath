@@ -11,14 +11,16 @@ extends CanvasLayer
 @onready var door_hint  : Label       = $DoorHint
 @onready var lvlup_panel: Control     = $LevelUp
 @onready var lvlup_hbox : HBoxContainer = $LevelUp/Panel/VBox/Cards
-@onready var go_panel   : Control     = $GameOver
+@onready var go_panel      : Control = $GameOver
+@onready var version_label : Label   = $VersionLabel
 
 var _current_choices : Array = []
 
 func _ready():
-	door_hint.visible  = false
+	door_hint.visible   = false
 	lvlup_panel.visible = false
-	go_panel.visible   = false
+	go_panel.visible    = false
+	version_label.text  = "v" + ProjectSettings.get_setting("application/config/version", "0.1.0")
 
 # ── HP ───────────────────────────────────────────────────────────
 func update_health(cur: int, mx: int):
