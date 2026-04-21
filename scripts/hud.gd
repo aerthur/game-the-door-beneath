@@ -1,4 +1,5 @@
 extends CanvasLayer
+# Dernière mise à jour : 2026-04-21
 
 @onready var hp_bar     : ProgressBar = $TopLeft/VBox/HPBar
 @onready var hp_label   : Label       = $TopLeft/VBox/HPLabel
