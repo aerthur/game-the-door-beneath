@@ -127,7 +127,7 @@ process_issue() {
     ALL_ISSUES=$(gh issue list \
       --repo "$REPO" \
       --state open \
-      --search "[F] in:title no:assignee -label:blocked" \
+      --search "[F] in:title no:assignee -label:blocked -label:agent-skip" \
       --limit 20 \
       --json number,title,body \
       2>/dev/null || echo "[]")
@@ -279,13 +279,15 @@ Log : \`/tmp/claude-output-${ISSUE_NUM}.log\`"
   if [ "$LAST_STEP" = "claude_done" ] || [ "$LAST_STEP" = "push_failed" ]; then
     COMMITS_AHEAD=$(git rev-list --count "origin/$MAIN_BRANCH..HEAD" 2>/dev/null || echo "0")
     if [ "$COMMITS_AHEAD" = "0" ]; then
-      log "Aucun commit créé — abandon"
+      log "Aucun commit créé — feature déjà implémentée ou rien à faire"
+      gh label create "agent-skip" --repo "$REPO" --color "e4e669" \
+        --description "Skippée par agent (déjà implémentée)" 2>/dev/null || true
       gh issue comment "$ISSUE_NUM" --repo "$REPO" \
-        --body "⚠️ L'agent n'a pas créé de commit. Vérification manuelle nécessaire."
-      gh issue edit "$ISSUE_NUM" --repo "$REPO" --remove-assignee "@me"
-      tg "*⚠️ Aucun commit créé*
-Issue \`#$ISSUE_NUM\` — $ISSUE_TITLE
-Claude n'a pas commité. Vérification manuelle nécessaire."
+        --body "⏭️ L'agent n'a rien commité — la feature semble déjà implémentée. Issue marquée \`agent-skip\` pour éviter une boucle. Vérification manuelle recommandée."
+      gh issue edit "$ISSUE_NUM" --repo "$REPO" --remove-assignee "@me" --add-label "agent-skip"
+      tg "*⏭️ Issue skippée*
+\`#$ISSUE_NUM\` — $ISSUE_TITLE
+Claude n'a rien commité (déjà implémenté ?). Label \`agent-skip\` ajouté."
       state_clear
       return 0
     fi
