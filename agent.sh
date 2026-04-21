@@ -151,16 +151,10 @@ process_issue() {
 
       DEPS_OK=true
       for DEP_NUM in $DEPS; do
-        # Vérifier si une PR qui ferme cette issue est mergée
-        DEP_PR_MERGED=$(gh pr list \
-          --repo "$REPO" \
-          --state merged \
-          --search "closes #${DEP_NUM}" \
-          --json number \
-          -q '.[0].number' 2>/dev/null || echo "")
-
-        if [ -z "$DEP_PR_MERGED" ]; then
-          log "Issue #$CANDIDATE_NUM bloquée par #$DEP_NUM (non mergée)"
+        # Vérifier si l'issue parente est fermée (= PR mergée ou résolue)
+        DEP_STATE=$(gh issue view "$DEP_NUM" --repo "$REPO" --json state -q '.state' 2>/dev/null || echo "OPEN")
+        if [ "$DEP_STATE" != "CLOSED" ]; then
+          log "Issue #$CANDIDATE_NUM bloquée par #$DEP_NUM (encore ouverte)"
           DEPS_OK=false
           break
         fi
