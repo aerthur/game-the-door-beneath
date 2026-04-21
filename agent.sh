@@ -25,6 +25,26 @@ STATE_FILE="$REPO_DIR/.agent_state.json"
 MAX_ISSUES=10   # sécurité : max d'issues par exécution
 LOG_PREFIX="[$(date '+%Y-%m-%d %H:%M:%S')] [agent]"
 
+# ── Telegram ──────────────────────────────────────────────────────
+# Les variables GAME_TELEGRAM_TOKEN et GAME_TELEGRAM_CHAT_ID
+# doivent être définies dans l'environnement du VPC.
+TELEGRAM_TOKEN="${GAME_TELEGRAM_TOKEN:-}"
+TELEGRAM_CHAT_ID="${GAME_TELEGRAM_CHAT_ID:-}"
+
+tg() {
+  # Usage : tg "message" [emoji_prefix]
+  local msg="${2:-} ${1}"
+  if [ -z "$TELEGRAM_TOKEN" ] || [ -z "$TELEGRAM_CHAT_ID" ]; then
+    log "[Telegram] Variables non configurées — notification ignorée"
+    return
+  fi
+  curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage" \
+    -d chat_id="$TELEGRAM_CHAT_ID" \
+    -d parse_mode="Markdown" \
+    -d text="$msg" \
+    > /dev/null 2>&1 || log "[Telegram] Envoi échoué"
+}
+
 # ── Helpers ───────────────────────────────────────────────────────
 log() { echo "$LOG_PREFIX $*"; }
 
@@ -166,6 +186,9 @@ process_issue() {
     gh issue edit "$ISSUE_NUM" --repo "$REPO" --add-assignee "@me"
     gh issue comment "$ISSUE_NUM" --repo "$REPO" \
       --body "🤖 Agent Claude Code a pris en charge cette issue. Implémentation en cours..."
+    tg "*🤖 Nouvelle issue prise en charge*
+\`#$ISSUE_NUM\` — $ISSUE_TITLE
+Branche : \`$BRANCH\`"
     state_write "issue_claimed"
   fi
 
@@ -232,10 +255,17 @@ Ne lance pas Godot. Commit à la fin."
     if [ "$CLAUDE_EXIT" -ne 0 ]; then
       if is_token_error "$CLAUDE_LOG"; then
         log "Quota/token épuisé — arrêt, reprise à la prochaine exécution"
+        tg "*⏸ Tokens épuisés*
+Issue \`#$ISSUE_NUM\` — $ISSUE_TITLE
+Reprise automatique à la prochaine exécution (cron 2h)."
         state_write "claude_interrupted"
         return 2
       fi
       log "Erreur Claude (exit $CLAUDE_EXIT) — état sauvegardé"
+      tg "*❌ Erreur Claude Code*
+Issue \`#$ISSUE_NUM\` — $ISSUE_TITLE
+Exit code : \`$CLAUDE_EXIT\`
+Log : \`/tmp/claude-output-${ISSUE_NUM}.log\`"
       state_write "claude_interrupted"
       return 1
     fi
@@ -252,6 +282,9 @@ Ne lance pas Godot. Commit à la fin."
       gh issue comment "$ISSUE_NUM" --repo "$REPO" \
         --body "⚠️ L'agent n'a pas créé de commit. Vérification manuelle nécessaire."
       gh issue edit "$ISSUE_NUM" --repo "$REPO" --remove-assignee "@me"
+      tg "*⚠️ Aucun commit créé*
+Issue \`#$ISSUE_NUM\` — $ISSUE_TITLE
+Claude n'a pas commité. Vérification manuelle nécessaire."
       state_clear
       return 0
     fi
@@ -305,6 +338,13 @@ Tester dans Godot 4.6 puis merger."
       --description "Traité par agent Claude Code" 2>/dev/null || true
     gh issue edit "$ISSUE_NUM" --repo "$REPO" --add-label "agent-done"
 
+    tg "*✅ Feature terminée !*
+\`#$ISSUE_NUM\` — $ISSUE_TITLE
+
+*PR :* $PR_URL
+
+À tester dans Godot 4.6, puis merger si c'est bon 👍"
+
     log "✓ Issue #$ISSUE_NUM traitée → $PR_URL"
     state_clear
     git checkout "$MAIN_BRANCH"
@@ -317,7 +357,11 @@ Tester dans Godot 4.6 puis merger."
 # BOUCLE PRINCIPALE
 # ══════════════════════════════════════════════════════════════════
 log "=== Démarrage agent — max $MAX_ISSUES issues ==="
+tg "*🚀 Agent démarré*
+Recherche d'issues \`[F]\` à traiter..."
+
 ISSUES_DONE=0
+SESSION_START=$(date '+%H:%M')
 
 while [ "$ISSUES_DONE" -lt "$MAX_ISSUES" ]; do
   process_issue
@@ -331,17 +375,38 @@ while [ "$ISSUES_DONE" -lt "$MAX_ISSUES" ]; do
         ;;
     2)  # token épuisé
         log "Tokens épuisés — arrêt propre. Reprise à la prochaine exécution."
+        tg "*📊 Rapport de session*
+🕐 $SESSION_START → $(date '+%H:%M')
+✅ Issues traitées : $ISSUES_DONE
+⏸ Arrêt : tokens épuisés — reprise dans ~2h"
         exit 0
         ;;
     3)  # aucune issue disponible
         log "Aucune issue disponible — fin de session ($ISSUES_DONE issues traitées)."
+        if [ "$ISSUES_DONE" -gt 0 ]; then
+          tg "*📊 Rapport de session*
+🕐 $SESSION_START → $(date '+%H:%M')
+✅ Issues traitées : $ISSUES_DONE
+💤 Aucune autre issue en attente"
+        else
+          tg "*💤 Aucune issue à traiter*
+Prochaine vérification dans 2h."
+        fi
         exit 0
         ;;
     *)  # erreur
         log "Erreur — arrêt ($ISSUES_DONE issues traitées)."
+        tg "*🔴 Erreur agent*
+🕐 $SESSION_START → $(date '+%H:%M')
+✅ Issues traitées : $ISSUES_DONE
+❌ Arrêt sur erreur — vérifier \`/var/log/claude-agent.log\`"
         exit 1
         ;;
   esac
 done
 
 log "Maximum atteint ($MAX_ISSUES issues) — fin de session."
+tg "*📊 Rapport de session*
+🕐 $SESSION_START → $(date '+%H:%M')
+✅ Issues traitées : $ISSUES_DONE/$MAX_ISSUES
+🏁 Maximum par session atteint"
