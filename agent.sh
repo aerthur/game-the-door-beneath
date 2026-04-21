@@ -120,7 +120,7 @@ process_issue() {
     ALL_ISSUES=$(gh issue list \
       --repo "$REPO" \
       --state open \
-      --search "[F] in:title no:assignee" \
+      --search "[F] in:title no:assignee -label:blocked" \
       --limit 20 \
       --json number,title,body \
       2>/dev/null || echo "[]")
