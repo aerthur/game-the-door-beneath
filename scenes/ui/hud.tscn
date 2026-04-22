@@ -37,7 +37,7 @@ text = "Salle  1"
 horizontal_alignment = 2
 
 [node name="ScoreLabel" type="Label" parent="TopRight/VBox"]
-text = "Score  0"
+text = "💰 Or : 0"
 horizontal_alignment = 2
 
 [node name="LaneLabel" type="Label" parent="TopRight/VBox"]
