@@ -208,9 +208,17 @@ process_issue() {
     LAST_STEP=$(state_read step)
     log "Reprise — issue #$ISSUE_NUM '$ISSUE_TITLE' — étape: $LAST_STEP"
 
-    ISSUE_STATE=$(gh issue view "$ISSUE_NUM" --repo "$REPO" --json state -q '.state' 2>/dev/null || echo "UNKNOWN")
+    ISSUE_INFO=$(gh issue view "$ISSUE_NUM" --repo "$REPO" --json state,labels 2>/dev/null || echo "{}")
+    ISSUE_STATE=$(echo "$ISSUE_INFO" | python3 -c "import sys,json; print(json.load(sys.stdin).get('state','UNKNOWN'))")
+    ISSUE_LABELS=$(echo "$ISSUE_INFO" | python3 -c "import sys,json; print(','.join(l['name'] for l in json.load(sys.stdin).get('labels',[])))")
+
     if [ "$ISSUE_STATE" != "OPEN" ]; then
       log "Issue #$ISSUE_NUM fermée — abandon"
+      state_clear
+      return 0  # continuer avec la suivante
+    fi
+    if echo "$ISSUE_LABELS" | grep -q "agent-skip"; then
+      log "Issue #$ISSUE_NUM a le label agent-skip — abandon de la reprise"
       state_clear
       return 0  # continuer avec la suivante
     fi
