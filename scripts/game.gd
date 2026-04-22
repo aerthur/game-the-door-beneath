@@ -572,7 +572,7 @@ func _generate_choices() -> Array:
 	var pool = []
 	for w in active_weapons:
 		pool.append({"type": "upgrade", "weapon_id": w.id, "current_level": w.level})
-	if active_weapons.size() < 3:
+	if active_weapons.size() < 4:
 		var unowned = _get_unowned_weapons()
 		unowned.shuffle()
 		for wid in unowned:
