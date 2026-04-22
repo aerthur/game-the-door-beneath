@@ -230,6 +230,15 @@ process_issue() {
       sed -i '1d' "$PENDING_RESTART_FILE"
       [ ! -s "$PENDING_RESTART_FILE" ] && rm -f "$PENDING_RESTART_FILE"
       if [ -n "$PENDING_NUM" ]; then
+        # Vérifier que l'issue n'a pas été marquée agent-skip entre-temps
+        PENDING_LABELS=$(gh issue view "$PENDING_NUM" --repo "$REPO" --json labels \
+          -q '[.labels[].name] | join(",")' 2>/dev/null || echo "")
+        if echo "$PENDING_LABELS" | grep -q "agent-skip"; then
+          log "Issue #$PENDING_NUM ignorée depuis PENDING_RESTART_FILE — label agent-skip présent."
+          PENDING_NUM=""
+        fi
+      fi
+      if [ -n "$PENDING_NUM" ]; then
         log "Reprise directe de l'issue restartée #$PENDING_NUM (bypass search)"
         ISSUE_NUM="$PENDING_NUM"
         ISSUE_TITLE=$(gh issue view "$PENDING_NUM" --repo "$REPO" --json title -q '.title' 2>/dev/null || echo "Issue #$PENDING_NUM")
