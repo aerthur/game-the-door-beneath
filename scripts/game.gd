@@ -84,6 +84,7 @@ var tick_interval : float = 1.0
 @onready var player_node   : Node2D      = $Player
 @onready var hud           : CanvasLayer = $HUD
 @onready var bg            : Node2D      = $Background
+@onready var visuals     : Node2D      = $Visuals
 
 var blob_scene  = preload("res://scenes/monster_blob.tscn")
 var blue_scene  = preload("res://scenes/monster_blue.tscn")
@@ -94,6 +95,7 @@ var gem_scene   = preload("res://scenes/gem.tscn")
 # ═════════════════════════════════════════════════════════════════
 func _ready():
 	add_to_group("game")
+	visuals.bg = bg
 	_init_grid()
 	_draw_background()
 	_place_player()
@@ -367,7 +369,7 @@ func _w_arc(w: Dictionary):
 		if grid[r][player_lane] != null:
 			var m = grid[r][player_lane]
 			var t = 0.15 + r * 0.02
-			_shoot_arrow(player_lane, r, t, Color(0.95, 0.85, 0.3))
+			visuals.shoot_arrow(player_lane, r, t, Color(0.95, 0.85, 0.3))
 			await get_tree().create_timer(t).timeout
 			if is_instance_valid(m): _deal_and_check(m, r, player_lane, _get_dmg(w))
 			return
@@ -378,7 +380,7 @@ func _w_arbalete(w: Dictionary):
 		if hit >= 2: break
 		if grid[r][player_lane] != null:
 			var m = grid[r][player_lane]
-			_shoot_arrow(player_lane, r, 0.18 + r * 0.015, Color(0.6, 0.6, 1.0), 5.0)
+			visuals.shoot_arrow(player_lane, r, 0.18 + r * 0.015, Color(0.6, 0.6, 1.0), 5.0)
 			await get_tree().create_timer(0.18 + r * 0.015).timeout
 			if is_instance_valid(m): _deal_and_check(m, r, player_lane, _get_dmg(w))
 			hit += 1
@@ -386,7 +388,7 @@ func _w_arbalete(w: Dictionary):
 func _w_dague(w: Dictionary):
 	for r in range(ROWS - 1, -1, -1):
 		if grid[r][player_lane] != null:
-			_show_slash(player_lane, r)
+			visuals.show_slash(player_lane, r)
 			_deal_and_check(grid[r][player_lane], r, player_lane, _get_dmg(w))
 			return
 
@@ -395,7 +397,7 @@ func _w_bombe(w: Dictionary):
 		if l < 0 or l >= LANES: continue
 		for r in range(ROWS - 1, -1, -1):
 			if grid[r][l] != null:
-				_show_explosion(l, r)
+				visuals.show_explosion(l, r)
 				await get_tree().create_timer(0.1).timeout
 				if grid[r][l] != null: _deal_and_check(grid[r][l], r, l, _get_dmg(w))
 				break
@@ -403,11 +405,11 @@ func _w_bombe(w: Dictionary):
 func _w_eclair(w: Dictionary):
 	for r in range(ROWS - 1, -1, -1):
 		if grid[r][player_lane] != null:
-			_show_lightning(player_lane, r)
+			visuals.show_lightning(player_lane, r)
 			_deal_and_check(grid[r][player_lane], r, player_lane, _get_dmg(w))
 
 func _w_tourbillon(w: Dictionary):
-	_show_whirlwind()
+	visuals.show_whirlwind()
 	for l in LANES:
 		for r in range(ROWS - 1, -1, -1):
 			if grid[r][l] != null:
@@ -418,7 +420,7 @@ func _w_givre(w: Dictionary):
 	for r in range(ROWS - 1, -1, -1):
 		if grid[r][player_lane] != null:
 			var m = grid[r][player_lane]
-			_shoot_arrow(player_lane, r, 0.2, Color(0.4, 0.85, 1.0), 3.0)
+			visuals.shoot_arrow(player_lane, r, 0.2, Color(0.4, 0.85, 1.0), 3.0)
 			await get_tree().create_timer(0.2).timeout
 			if is_instance_valid(m):
 				m.freeze(2)
@@ -426,7 +428,7 @@ func _w_givre(w: Dictionary):
 			return
 
 func _w_sismique(w: Dictionary):
-	_show_quake()
+	visuals.show_quake()
 	for r in [ROWS - 1, ROWS - 2]:
 		for l in LANES:
 			if r >= 0 and grid[r][l] != null:
@@ -445,7 +447,7 @@ func _deal_and_check(m: Node2D, _row: int, _lane: int, dmg: int):
 		grid[row][lane] = null
 		var pos = m.position
 		m.queue_free()
-		_play_death_anim(pos, mtype, false)
+		visuals.play_death_anim(pos, mtype, false)
 		_on_monster_killed(lane, pos, xp_val, mtype)
 
 func _on_monster_killed(lane: int, kill_pos: Vector2, xp_val: int, mtype: String):
@@ -453,7 +455,7 @@ func _on_monster_killed(lane: int, kill_pos: Vector2, xp_val: int, mtype: String
 	_add_gold(gold_table.get(mtype, 0))
 	monsters_remaining -= 1
 	print("[KILL] File %d — remaining: %d — grid_empty: %s — in_flight: %d" % [lane+1, monsters_remaining, _grid_empty(), spawns_in_flight])
-	_show_gold_float(kill_pos, gold_table.get(mtype, 0))
+	visuals.show_gold_float(kill_pos, gold_table.get(mtype, 0))
 	_spawn_gem(lane, kill_pos, xp_val)
 	_check_room_clear()
 
@@ -461,18 +463,6 @@ func _add_gold(amount: int):
 	gold_current      += amount
 	gold_total_earned += amount
 	hud.update_gold(gold_current)
-
-func _show_gold_float(pos: Vector2, amount: int):
-	var lbl = Label.new()
-	lbl.text = "+%d 💰" % amount
-	lbl.position = pos + Vector2(-28, -30)
-	lbl.add_theme_font_size_override("font_size", 18)
-	lbl.add_theme_color_override("font_color", Color(1.0, 0.85, 0.1))
-	bg.add_child(lbl)
-	var tw = create_tween()
-	tw.tween_property(lbl, "position", lbl.position + Vector2(0, -50), 0.7)
-	tw.parallel().tween_property(lbl, "modulate", Color(1, 1, 1, 0), 0.7)
-	tw.tween_callback(lbl.queue_free)
 
 func _check_room_clear():
 	if room_clear or game_over: return
@@ -494,175 +484,10 @@ func _grid_empty() -> bool:
 	return true
 
 func _room_cleared():
-	await _play_door_animation()
-	# room_clear est mis à true à la fin de _play_door_animation, après le lore
+	await visuals.play_door_animation(room_num, player_lane, _add_gold)
+	room_clear = true
 	_start_room(room_num + 1)
 
-func _get_room_gold_bonus(room: int) -> int:
-	var table = {1: 20, 2: 40, 3: 70, 4: 110, 5: 150, 6: 200, 7: 260, 8: 330, 9: 410}
-	if table.has(room):
-		return table[room]
-	return 410 + (room - 10) * 60
-
-func _play_door_animation():
-	var door_w  = 200
-	var door_h  = 280
-	var cx      = 640
-	var cy      = 340
-	var door_x  = cx - door_w / 2
-	var door_y  = cy - door_h / 2
-
-	var stone = ColorRect.new()
-	stone.size     = Vector2(door_w + 20, door_h + 20)
-	stone.position = Vector2(door_x - 10, door_y - 10)
-	stone.color    = Color(0.45, 0.42, 0.40)
-	bg.add_child(stone)
-
-	var glow = ColorRect.new()
-	glow.size     = Vector2(door_w, door_h)
-	glow.position = Vector2(door_x, door_y)
-	glow.color    = Color(1.0, 0.85, 0.2, 0.0)
-	bg.add_child(glow)
-
-	var left_panel = ColorRect.new()
-	left_panel.size     = Vector2(door_w / 2, door_h)
-	left_panel.position = Vector2(door_x, door_y)
-	left_panel.color    = Color(0.35, 0.2, 0.1)
-	bg.add_child(left_panel)
-
-	var right_panel = ColorRect.new()
-	right_panel.size     = Vector2(door_w / 2, door_h)
-	right_panel.position = Vector2(cx, door_y)
-	right_panel.color    = Color(0.35, 0.2, 0.1)
-	bg.add_child(right_panel)
-
-	_play_jackpot_sound()
-
-	var t0 = Time.get_ticks_msec() / 1000.0
-	var has_lore = LORE_TEXTS.has(room_num)
-	if has_lore:
-		_show_lore_text(room_num)
-
-	var tw = create_tween()
-	tw.tween_property(left_panel,  "position:x", float(door_x - door_w / 2), 0.8)
-	tw.parallel().tween_property(right_panel, "position:x", float(cx + door_w / 2), 0.8)
-	tw.parallel().tween_property(glow, "color", Color(1.0, 0.85, 0.2, 0.6), 0.4)
-	await tw.finished
-
-	# +Or au-dessus du joueur
-	var gold_bonus = _get_room_gold_bonus(room_num)
-	_add_gold(gold_bonus)
-	var pcx = GRID_X + player_lane * LANE_W + LANE_W * 0.5
-	var py  = float(PLAYER_Y) - 80.0
-	var gold_lbl = Label.new()
-	gold_lbl.text = "+%d 💰" % gold_bonus
-	gold_lbl.custom_minimum_size = Vector2(200, 0)
-	gold_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	gold_lbl.position = Vector2(pcx - 100.0, py)
-	gold_lbl.add_theme_font_size_override("font_size", 52)
-	gold_lbl.add_theme_color_override("font_color", Color(1.0, 0.85, 0.2))
-	bg.add_child(gold_lbl)
-	var tw2 = create_tween()
-	tw2.tween_property(gold_lbl, "position:y", py - 110.0, 1.1)
-	tw2.parallel().tween_property(gold_lbl, "modulate", Color(1, 1, 1, 0), 1.1)
-	await tw2.finished
-	if is_instance_valid(gold_lbl): gold_lbl.queue_free()
-
-	var tw3 = create_tween()
-	tw3.tween_property(stone,       "modulate", Color(1, 1, 1, 0), 0.4)
-	tw3.parallel().tween_property(glow,        "modulate", Color(1, 1, 1, 0), 0.4)
-	tw3.parallel().tween_property(left_panel,  "modulate", Color(1, 1, 1, 0), 0.4)
-	tw3.parallel().tween_property(right_panel, "modulate", Color(1, 1, 1, 0), 0.4)
-	await tw3.finished
-
-	for n in [stone, glow, left_panel, right_panel]:
-		if is_instance_valid(n): n.queue_free()
-
-	if has_lore:
-		var lore_total = 0.3 + 2.5 + 0.3
-		var elapsed = Time.get_ticks_msec() / 1000.0 - t0
-		var remain = lore_total - elapsed
-		if remain > 0.0:
-			await get_tree().create_timer(remain).timeout
-
-	room_clear = true
-
-func _show_lore_text(rnum: int):
-	var text = LORE_TEXTS.get(rnum, "")
-	if text.is_empty():
-		return
-
-	var panel_w = 800
-	var panel_h = 68
-	var panel_x = 640.0 - panel_w / 2.0
-	var panel_y = 498.0
-
-	var panel = ColorRect.new()
-	panel.color    = Color(0.0, 0.0, 0.0, 0.60)
-	panel.size     = Vector2(panel_w, panel_h)
-	panel.position = Vector2(panel_x, panel_y)
-	panel.modulate.a = 0.0
-	bg.add_child(panel)
-
-	var lbl = RichTextLabel.new()
-	lbl.bbcode_enabled = true
-	lbl.fit_content    = true
-	lbl.scroll_active  = false
-	lbl.text           = "[center][i]" + text + "[/i][/center]"
-	lbl.size           = Vector2(panel_w - 24, panel_h)
-	lbl.position       = Vector2(panel_x + 12, panel_y + 10)
-	lbl.add_theme_font_size_override("normal_font_size", 17)
-	lbl.add_theme_color_override("default_color", Color(0.9, 0.88, 0.8))
-	lbl.modulate.a = 0.0
-	bg.add_child(lbl)
-
-	var tw = create_tween()
-	tw.tween_property(panel, "modulate:a", 1.0, 0.3)
-	tw.parallel().tween_property(lbl, "modulate:a", 1.0, 0.3)
-	await tw.finished
-
-	await get_tree().create_timer(2.5).timeout
-
-	var tw2 = create_tween()
-	tw2.tween_property(panel, "modulate:a", 0.0, 0.3)
-	tw2.parallel().tween_property(lbl, "modulate:a", 0.0, 0.3)
-	await tw2.finished
-
-	if is_instance_valid(panel): panel.queue_free()
-	if is_instance_valid(lbl): lbl.queue_free()
-
-func _play_jackpot_sound():
-	var player = AudioStreamPlayer.new()
-	add_child(player)
-
-	var stream = AudioStreamGenerator.new()
-	stream.mix_rate     = 22050.0
-	stream.buffer_length = 0.6
-	player.stream    = stream
-	player.volume_db = -8.0
-	player.play()
-
-	var playback = player.get_stream_playback() as AudioStreamGeneratorPlayback
-	if playback == null:
-		player.queue_free()
-		return
-
-	var sample_rate  = 22050.0
-	var notes        = [523.0, 659.0, 784.0, 1047.0]
-	var note_duration = 0.1
-
-	for note_freq in notes:
-		var n_samples = int(sample_rate * note_duration)
-		for i in n_samples:
-			var t        = float(i) / sample_rate
-			var envelope = 1.0 - float(i) / float(n_samples)
-			var sample   = sin(TAU * note_freq * t) * 0.25 * envelope
-			playback.push_frame(Vector2(sample, sample))
-
-	await get_tree().create_timer(0.55).timeout
-	if is_instance_valid(player): player.queue_free()
-
-# ── Gemmes ───────────────────────────────────────────────────────
 func _spawn_gem(lane: int, pos: Vector2, xp_val: int):
 	var g = gem_scene.instantiate()
 	g.lane     = lane
@@ -780,200 +605,3 @@ func _input(event: InputEvent):
 		_move_player(1)
 	elif event.is_action_pressed("next_room") and room_clear:
 		_start_room(room_num + 1)
-
-# ── Visuels d'attaque ────────────────────────────────────────────
-func _shoot_arrow(lane: int, target_row: int, duration: float,
-				  col: Color = Color(0.95, 0.85, 0.3), w: float = 3.0):
-	var arrow = Node2D.new()
-	var shaft = Line2D.new()
-	shaft.add_point(Vector2(0, 0)); shaft.add_point(Vector2(0, -28))
-	shaft.width = w; shaft.default_color = col
-	arrow.add_child(shaft)
-	var tip = ColorRect.new()
-	tip.size = Vector2(7, 9); tip.position = Vector2(-3.5, -37)
-	tip.color = col.lightened(0.2); arrow.add_child(tip)
-	var feather = ColorRect.new()
-	feather.size = Vector2(12, 4); feather.position = Vector2(-6, -4)
-	feather.color = Color(0.9, 0.88, 0.78); arrow.add_child(feather)
-	arrow.position = Vector2(GRID_X + lane * LANE_W + LANE_W * 0.5, PLAYER_Y - 35)
-	bg.add_child(arrow)
-	var tw = create_tween()
-	tw.tween_property(arrow, "position", grid_pos(target_row, lane), duration)
-	await tw.finished
-	if is_instance_valid(arrow): arrow.queue_free()
-
-func _show_slash(lane: int, row: int):
-	var slash = Line2D.new()
-	slash.add_point(Vector2(-22, -18)); slash.add_point(Vector2(22, 18))
-	slash.width = 4.0; slash.default_color = Color(1.0, 0.9, 0.4, 0.85)
-	slash.position = grid_pos(row, lane); bg.add_child(slash)
-	await get_tree().create_timer(0.09).timeout
-	if is_instance_valid(slash): slash.queue_free()
-
-func _show_explosion(lane: int, row: int):
-	var exp = ColorRect.new()
-	exp.size = Vector2(LANE_W - 4, ROW_H - 4)
-	exp.position = Vector2(GRID_X + lane * LANE_W + 2, GRID_Y + row * ROW_H + 2)
-	exp.color = Color(1.0, 0.55, 0.1, 0.70); bg.add_child(exp)
-	await get_tree().create_timer(0.15).timeout
-	if is_instance_valid(exp): exp.queue_free()
-
-func _show_lightning(lane: int, row: int):
-	var bolt = Line2D.new()
-	var sx = GRID_X + lane * LANE_W + LANE_W * 0.5
-	bolt.add_point(Vector2(sx, PLAYER_Y))
-	bolt.add_point(Vector2(sx + randf_range(-12, 12), grid_pos(row, lane).y))
-	bolt.width = 4.0; bolt.default_color = Color(0.6, 0.6, 1.0, 0.9)
-	bg.add_child(bolt)
-	await get_tree().create_timer(0.12).timeout
-	if is_instance_valid(bolt): bolt.queue_free()
-
-func _show_whirlwind():
-	var rect = ColorRect.new()
-	rect.size = Vector2(LANES * LANE_W, ROW_H)
-	rect.position = Vector2(GRID_X, GRID_Y + (ROWS - 1) * ROW_H)
-	rect.color = Color(0.8, 0.5, 1.0, 0.35); bg.add_child(rect)
-	await get_tree().create_timer(0.18).timeout
-	if is_instance_valid(rect): rect.queue_free()
-
-func _show_quake():
-	var rect = ColorRect.new()
-	rect.size = Vector2(LANES * LANE_W, ROW_H * 2)
-	rect.position = Vector2(GRID_X, GRID_Y + (ROWS - 2) * ROW_H)
-	rect.color = Color(0.9, 0.65, 0.2, 0.40); bg.add_child(rect)
-	var cam = get_viewport().get_camera_2d()
-	if cam:
-		var tw = create_tween()
-		tw.tween_property(cam, "offset", Vector2(6, 0), 0.05)
-		tw.tween_property(cam, "offset", Vector2(-6, 0), 0.05)
-		tw.tween_property(cam, "offset", Vector2(0, 0), 0.05)
-	await get_tree().create_timer(0.20).timeout
-	if is_instance_valid(rect): rect.queue_free()
-
-# ── Animations de mort ───────────────────────────────────────────
-func _play_death_anim(pos: Vector2, type: String, is_boss: bool):
-	if is_boss:
-		_death_anim_boss(pos)
-		return
-	match type:
-		"g": _death_anim_green(pos)
-		"b": _death_anim_blue(pos)
-		"r": _death_anim_red(pos)
-
-func _death_anim_green(pos: Vector2):
-	var count = randi_range(6, 8)
-	for i in count:
-		var sq = ColorRect.new()
-		sq.size = Vector2(7, 7)
-		sq.color = Color(0.2, 0.85, 0.25)
-		sq.position = pos - Vector2(3.5, 3.5)
-		bg.add_child(sq)
-		var angle = (float(i) / count) * TAU + randf_range(-0.15, 0.15)
-		var dist  = randf_range(22.0, 46.0)
-		var target = pos + Vector2(cos(angle), sin(angle)) * dist - Vector2(3.5, 3.5)
-		var tw = create_tween()
-		tw.tween_property(sq, "position", target, 0.3)
-		tw.parallel().tween_property(sq, "modulate", Color(1, 1, 1, 0), 0.3)
-		tw.tween_callback(sq.queue_free)
-
-func _death_anim_blue(pos: Vector2):
-	var flash = ColorRect.new()
-	flash.size = Vector2(32, 32)
-	flash.position = pos - Vector2(16, 16)
-	flash.color = Color(1.0, 1.0, 1.0, 0.9)
-	bg.add_child(flash)
-	var tw = create_tween()
-	for _i in 3:
-		tw.tween_property(flash, "color", Color(1.0, 1.0, 1.0, 0.9), 0.04)
-		tw.tween_property(flash, "color", Color(0.3, 0.5, 1.0, 0.7), 0.04)
-	tw.tween_property(flash, "modulate", Color(1, 1, 1, 0), 0.05)
-	tw.tween_callback(flash.queue_free)
-	await get_tree().create_timer(0.10).timeout
-	var shard_count = 6
-	for i in shard_count:
-		var shard = Line2D.new()
-		var angle = (float(i) / shard_count) * TAU
-		var length = randf_range(12.0, 28.0)
-		var dir = Vector2(cos(angle), sin(angle))
-		shard.add_point(Vector2(0, 0))
-		shard.add_point(dir * length)
-		shard.width = 2.5
-		shard.default_color = Color(0.4, 0.6, 1.0)
-		shard.position = pos
-		bg.add_child(shard)
-		var tw2 = create_tween()
-		tw2.tween_property(shard, "position", pos + dir * 20.0, 0.15)
-		tw2.parallel().tween_property(shard, "modulate", Color(1, 1, 1, 0), 0.15)
-		tw2.tween_callback(shard.queue_free)
-
-func _death_anim_red(pos: Vector2):
-	var flash = ColorRect.new()
-	flash.size = Vector2(42, 42)
-	flash.position = pos - Vector2(21, 21)
-	flash.color = Color(1.0, 0.1, 0.1, 0.85)
-	bg.add_child(flash)
-	var tw = create_tween()
-	tw.tween_property(flash, "modulate", Color(1, 1, 1, 0), 0.2)
-	tw.tween_callback(flash.queue_free)
-	var ring = Line2D.new()
-	ring.width = 3.0
-	ring.default_color = Color(1.0, 0.2, 0.2, 0.85)
-	var pts = 16
-	for i in pts + 1:
-		var angle = (float(i) / pts) * TAU
-		ring.add_point(Vector2(cos(angle), sin(angle)) * 8.0)
-	ring.position = pos
-	bg.add_child(ring)
-	var tw2 = create_tween()
-	tw2.tween_property(ring, "scale", Vector2(4.5, 4.5), 0.35)
-	tw2.parallel().tween_property(ring, "modulate", Color(1, 1, 1, 0), 0.35)
-	tw2.tween_callback(ring.queue_free)
-
-func _death_anim_boss(pos: Vector2):
-	var flash = ColorRect.new()
-	flash.size = Vector2(70, 70)
-	flash.position = pos - Vector2(35, 35)
-	flash.color = Color(1.0, 0.85, 0.1, 0.9)
-	bg.add_child(flash)
-	var tw = create_tween()
-	tw.tween_property(flash, "modulate", Color(1, 1, 1, 0), 0.35)
-	tw.tween_callback(flash.queue_free)
-	var shard_count = 10
-	for i in shard_count:
-		var shard = Line2D.new()
-		var angle = (float(i) / shard_count) * TAU
-		var length = randf_range(20.0, 45.0)
-		var dir = Vector2(cos(angle), sin(angle))
-		shard.add_point(Vector2(0, 0))
-		shard.add_point(dir * length)
-		shard.width = 3.5
-		shard.default_color = Color(1.0, 0.75, 0.1)
-		shard.position = pos
-		bg.add_child(shard)
-		var tw2 = create_tween()
-		tw2.tween_property(shard, "position", pos + dir * 30.0, 0.5)
-		tw2.parallel().tween_property(shard, "modulate", Color(1, 1, 1, 0), 0.5)
-		tw2.tween_callback(shard.queue_free)
-	for wave_i in 2:
-		var ring = Line2D.new()
-		ring.width = 4.0 - wave_i * 1.5
-		ring.default_color = Color(1.0, 0.5, 0.1, 0.75 - wave_i * 0.25)
-		var pts = 20
-		for i in pts + 1:
-			var angle = (float(i) / pts) * TAU
-			ring.add_point(Vector2(cos(angle), sin(angle)) * 8.0)
-		ring.position = pos
-		bg.add_child(ring)
-		var ring_tw = create_tween()
-		ring_tw.tween_interval(wave_i * 0.15)
-		ring_tw.tween_property(ring, "scale", Vector2(6.0 + wave_i * 2.0, 6.0 + wave_i * 2.0), 0.55)
-		ring_tw.parallel().tween_property(ring, "modulate", Color(1, 1, 1, 0), 0.55)
-		ring_tw.tween_callback(ring.queue_free)
-	var cam = get_viewport().get_camera_2d()
-	if cam:
-		var shake_tw = create_tween()
-		shake_tw.tween_property(cam, "offset", Vector2(8, 4), 0.07)
-		shake_tw.tween_property(cam, "offset", Vector2(-8, -4), 0.07)
-		shake_tw.tween_property(cam, "offset", Vector2(5, -3), 0.06)
-		shake_tw.tween_property(cam, "offset", Vector2(-5, 3), 0.06)
-		shake_tw.tween_property(cam, "offset", Vector2(0, 0), 0.05)

@@ -1,0 +1,55 @@
+class_name GameData
+
+# ── Grille ───────────────────────────────────────────────────────
+const LANES    = 5
+const ROWS     = 8
+const LANE_W   = 180
+const ROW_H    = 68
+const GRID_X   = (1280 - LANES * LANE_W) / 2
+const GRID_Y   = 30
+const PLAYER_Y = GRID_Y + ROWS * ROW_H + 24
+
+# ── Composition des salles ───────────────────────────────────────
+const ROOM_WAVES = {
+	1:  ["g","g","g"],
+	2:  ["g","g","g","g"],
+	3:  ["g","g","g","b"],
+	4:  ["g","g","b","b"],
+	5:  ["g","b","b","b","b"],
+	6:  ["g","g","b","b","b"],
+	7:  ["g","b","b","b","b","b"],
+	8:  ["b","b","b","b","r","r"],
+	9:  ["b","b","b","r","r","r","r"],
+	10: ["b","b","r","r","r","r","r"],
+}
+
+# ── Lore inter-salles ────────────────────────────────────────────
+const LORE_TEXTS = {
+	1:  "L'air est humide. Mes bottes résonnent dans le silence. Je descends.",
+	2:  "Ces créatures... elles étaient plus nombreuses que prévu. Je continue quand même.",
+	3:  "Quelque chose remonte des profondeurs. Une odeur. Ancienne.",
+	4:  "Mes mains tremblent légèrement. Je les ignore. La porte m'attend.",
+	5:  "Ce monstre... il gardait cette porte. Pourquoi garder une porte ?",
+	6:  "Plus bas. Toujours plus bas. La lumière du jour n'existe plus ici.",
+	7:  "Je repense aux histoires qu'on racontait sur ce donjon. Je regrette de ne pas avoir écouté.",
+	8:  "Ils se multiplient. Comme si le donjon lui-même voulait me repousser.",
+	9:  "Je ne sais plus depuis combien de temps je descends. Le temps est différent ici.",
+	10: "Ce gardien était plus fort. Beaucoup plus fort. Ce qui suit sera pire.",
+	11: "Mes flèches s'épuisent. Heureusement quelque chose dans ce donjon me réapprovisionne. Je préfère ne pas savoir quoi.",
+	12: "J'ai entendu une voix. Très loin en dessous. Elle semblait... m'attendre.",
+	13: "Le sol vibre légèrement sous mes pieds. Quelque chose de gigantesque se déplace là-dessous.",
+	14: "Je pourrais faire demi-tour. Cette pensée me traverse l'esprit à chaque salle. Je ne le ferai pas.",
+	15: "Ce gardien rouge... ses yeux étaient intelligents. Il savait qui j'étais. Comment est-ce possible ?",
+}
+
+# ── Définitions des armes ────────────────────────────────────────
+const WEAPON_DEFS = {
+	"arc":        {"name": "Arc",        "base_dmg": 25, "cd": 1.0,  "desc": "1 ennemi dans la file active",       "icon": "🏹", "icon_path": ""},
+	"arbalete":   {"name": "Arbalète",   "base_dmg": 55, "cd": 2.0,  "desc": "Perce 2 ennemis dans la file",       "icon": "🎯", "icon_path": ""},
+	"dague":      {"name": "Dague",      "base_dmg": 10, "cd": 0.35, "desc": "Très rapide, file active",           "icon": "🗡️", "icon_path": ""},
+	"bombe":      {"name": "Bombe",      "base_dmg": 20, "cd": 2.5,  "desc": "Explose sur 3 files voisines",       "icon": "💣", "icon_path": ""},
+	"eclair":     {"name": "Eclair",     "base_dmg": 16, "cd": 1.5,  "desc": "Frappe tous les ennemis de la file", "icon": "⚡", "icon_path": ""},
+	"tourbillon": {"name": "Tourbillon", "base_dmg": 12, "cd": 2.0,  "desc": "1ère rangée de chaque file",         "icon": "🌀", "icon_path": ""},
+	"givre":      {"name": "Givre",      "base_dmg": 8,  "cd": 1.5,  "desc": "Ralentit l'ennemi 2 ticks",          "icon": "❄️", "icon_path": ""},
+	"sismique":   {"name": "Sismique",   "base_dmg": 9,  "cd": 3.0,  "desc": "2 dernières rangées, toutes files",  "icon": "🪨", "icon_path": ""},
+}
