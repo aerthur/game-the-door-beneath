@@ -12,7 +12,7 @@ Jeu roguelite en lanes développé avec **Godot 4.6** et **GDScript 2.0**.
 - Les monstres descendent du haut vers le bas, tick par tick (1 tick/sec)
 - Si un monstre atteint le bas : touche le joueur s'il est dans sa file, puis se duplique (2 nouveaux apparaissent en haut)
 - 10 salles de difficulté croissante — ESPACE pour passer à la salle suivante quand elle est vidée
-- 3 types de monstres, 8 armes débloquables, système XP/niveau
+- 3 types de monstres, 8 armes débloquables (max 4 actives simultanément), système XP/niveau
 
 ## Structure des fichiers
 ```
