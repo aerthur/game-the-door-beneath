@@ -352,11 +352,13 @@ func _deal_and_check(m: Node2D, _row: int, _lane: int, dmg: int):
 	m.take_damage(dmg)
 	if m.hp <= 0:
 		# Utiliser la position ACTUELLE du monstre (pas celle capturée au moment du tir)
-		var row  = m.grid_row
-		var lane = m.grid_lane
+		var row   = m.grid_row
+		var lane  = m.grid_lane
+		var mtype = m.monster_type
 		grid[row][lane] = null
 		var pos = m.position
 		m.queue_free()
+		_play_death_anim(pos, mtype, false)
 		_on_monster_killed(lane, pos, xp_val)
 
 func _on_monster_killed(lane: int, kill_pos: Vector2, xp_val: int):
@@ -575,3 +577,144 @@ func _show_quake():
 		tw.tween_property(cam, "offset", Vector2(0, 0), 0.05)
 	await get_tree().create_timer(0.20).timeout
 	if is_instance_valid(rect): rect.queue_free()
+
+# ── Animations de mort ───────────────────────────────────────────
+func _play_death_anim(pos: Vector2, type: String, is_boss: bool):
+	if is_boss:
+		_death_anim_boss(pos)
+		return
+	match type:
+		"g": _death_anim_green(pos)
+		"b": _death_anim_blue(pos)
+		"r": _death_anim_red(pos)
+
+func _death_anim_green(pos: Vector2):
+	var count = randi_range(6, 8)
+	for i in count:
+		var sq = ColorRect.new()
+		sq.size = Vector2(7, 7)
+		sq.color = Color(0.2, 0.85, 0.25)
+		sq.position = pos - Vector2(3.5, 3.5)
+		bg.add_child(sq)
+		var angle = (float(i) / count) * TAU + randf_range(-0.15, 0.15)
+		var dist  = randf_range(22.0, 46.0)
+		var target = pos + Vector2(cos(angle), sin(angle)) * dist - Vector2(3.5, 3.5)
+		var tw = create_tween()
+		tw.tween_property(sq, "position", target, 0.3)
+		tw.parallel().tween_property(sq, "modulate", Color(1, 1, 1, 0), 0.3)
+		tw.tween_callback(sq.queue_free)
+
+func _death_anim_blue(pos: Vector2):
+	# Clignotement blanc/bleu 3 fois
+	var flash = ColorRect.new()
+	flash.size = Vector2(32, 32)
+	flash.position = pos - Vector2(16, 16)
+	flash.color = Color(1.0, 1.0, 1.0, 0.9)
+	bg.add_child(flash)
+	var tw = create_tween()
+	for _i in 3:
+		tw.tween_property(flash, "color", Color(1.0, 1.0, 1.0, 0.9), 0.04)
+		tw.tween_property(flash, "color", Color(0.3, 0.5, 1.0, 0.7), 0.04)
+	tw.tween_property(flash, "modulate", Color(1, 1, 1, 0), 0.05)
+	tw.tween_callback(flash.queue_free)
+
+	# Éclats décalés
+	await get_tree().create_timer(0.10).timeout
+	var shard_count = 6
+	for i in shard_count:
+		var shard = Line2D.new()
+		var angle = (float(i) / shard_count) * TAU
+		var length = randf_range(12.0, 28.0)
+		var dir = Vector2(cos(angle), sin(angle))
+		shard.add_point(Vector2(0, 0))
+		shard.add_point(dir * length)
+		shard.width = 2.5
+		shard.default_color = Color(0.4, 0.6, 1.0)
+		shard.position = pos
+		bg.add_child(shard)
+		var tw2 = create_tween()
+		tw2.tween_property(shard, "position", pos + dir * 20.0, 0.15)
+		tw2.parallel().tween_property(shard, "modulate", Color(1, 1, 1, 0), 0.15)
+		tw2.tween_callback(shard.queue_free)
+
+func _death_anim_red(pos: Vector2):
+	# Flash rouge intense
+	var flash = ColorRect.new()
+	flash.size = Vector2(42, 42)
+	flash.position = pos - Vector2(21, 21)
+	flash.color = Color(1.0, 0.1, 0.1, 0.85)
+	bg.add_child(flash)
+	var tw = create_tween()
+	tw.tween_property(flash, "modulate", Color(1, 1, 1, 0), 0.2)
+	tw.tween_callback(flash.queue_free)
+
+	# Shockwave circulaire (Line2D en cercle qui s'élargit)
+	var ring = Line2D.new()
+	ring.width = 3.0
+	ring.default_color = Color(1.0, 0.2, 0.2, 0.85)
+	var pts = 16
+	for i in pts + 1:
+		var angle = (float(i) / pts) * TAU
+		ring.add_point(Vector2(cos(angle), sin(angle)) * 8.0)
+	ring.position = pos
+	bg.add_child(ring)
+	var tw2 = create_tween()
+	tw2.tween_property(ring, "scale", Vector2(4.5, 4.5), 0.35)
+	tw2.parallel().tween_property(ring, "modulate", Color(1, 1, 1, 0), 0.35)
+	tw2.tween_callback(ring.queue_free)
+
+func _death_anim_boss(pos: Vector2):
+	# Grand flash doré
+	var flash = ColorRect.new()
+	flash.size = Vector2(70, 70)
+	flash.position = pos - Vector2(35, 35)
+	flash.color = Color(1.0, 0.85, 0.1, 0.9)
+	bg.add_child(flash)
+	var tw = create_tween()
+	tw.tween_property(flash, "modulate", Color(1, 1, 1, 0), 0.35)
+	tw.tween_callback(flash.queue_free)
+
+	# Gros éclats
+	var shard_count = 10
+	for i in shard_count:
+		var shard = Line2D.new()
+		var angle = (float(i) / shard_count) * TAU
+		var length = randf_range(20.0, 45.0)
+		var dir = Vector2(cos(angle), sin(angle))
+		shard.add_point(Vector2(0, 0))
+		shard.add_point(dir * length)
+		shard.width = 3.5
+		shard.default_color = Color(1.0, 0.75, 0.1)
+		shard.position = pos
+		bg.add_child(shard)
+		var tw2 = create_tween()
+		tw2.tween_property(shard, "position", pos + dir * 30.0, 0.5)
+		tw2.parallel().tween_property(shard, "modulate", Color(1, 1, 1, 0), 0.5)
+		tw2.tween_callback(shard.queue_free)
+
+	# Double shockwave décalée
+	for wave_i in 2:
+		var ring = Line2D.new()
+		ring.width = 4.0 - wave_i * 1.5
+		ring.default_color = Color(1.0, 0.5, 0.1, 0.75 - wave_i * 0.25)
+		var pts = 20
+		for i in pts + 1:
+			var angle = (float(i) / pts) * TAU
+			ring.add_point(Vector2(cos(angle), sin(angle)) * 8.0)
+		ring.position = pos
+		bg.add_child(ring)
+		var ring_tw = create_tween()
+		ring_tw.tween_interval(wave_i * 0.15)
+		ring_tw.tween_property(ring, "scale", Vector2(6.0 + wave_i * 2.0, 6.0 + wave_i * 2.0), 0.55)
+		ring_tw.parallel().tween_property(ring, "modulate", Color(1, 1, 1, 0), 0.55)
+		ring_tw.tween_callback(ring.queue_free)
+
+	# Screen shake
+	var cam = get_viewport().get_camera_2d()
+	if cam:
+		var shake_tw = create_tween()
+		shake_tw.tween_property(cam, "offset", Vector2(8, 4), 0.07)
+		shake_tw.tween_property(cam, "offset", Vector2(-8, -4), 0.07)
+		shake_tw.tween_property(cam, "offset", Vector2(5, -3), 0.06)
+		shake_tw.tween_property(cam, "offset", Vector2(-5, 3), 0.06)
+		shake_tw.tween_property(cam, "offset", Vector2(0, 0), 0.05)
