@@ -7,10 +7,11 @@ extends Node2D
 #   weapons.visuals     = visuals
 #   weapons.deal_fn     = _deal_and_check  ← Callable
 
-var grid        : Array
-var visuals     : Node2D
-var deal_fn     : Callable  # func(m, row, lane, dmg)
-var player_lane : int = 2   # mis à jour par game.gd à chaque déplacement
+var grid             : Array
+var visuals          : Node2D
+var deal_fn          : Callable  # func(m, row, lane, dmg)
+var player_lane      : int = 2   # mis à jour par game.gd à chaque déplacement
+var active_weapon_id : String = ""  # arme actuellement en cours de tir (pour stats)
 
 # ── Dégâts ───────────────────────────────────────────────────────
 func get_dmg(w: Dictionary) -> int:
@@ -18,6 +19,7 @@ func get_dmg(w: Dictionary) -> int:
 
 # ── Dispatch ─────────────────────────────────────────────────────
 func fire(w: Dictionary):
+	active_weapon_id = w.id
 	match w.id:
 		"arc":        _w_arc(w)
 		"arbalete":   _w_arbalete(w)

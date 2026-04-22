@@ -93,6 +93,15 @@ var grid               : Array # grid[row][lane] = monstre Node2D ou null
 La salle est terminée quand `_grid_empty() == true AND spawns_in_flight == 0`.
 Ne pas se fier uniquement à `monsters_remaining` qui peut dériver à cause des coroutines async concurrentes.
 
+### Système de records (issue #27)
+Stats de la run courante dans `run_stats` (score, salle, temps, kills par type, kills par arme).
+Records persistants dans `records`, sauvegardés dans `user://records.cfg` via `ConfigFile`.
+- `_init_run_stats()` — appelée dans `_start_room(1)`, réinitialise `run_stats` et démarre le chrono
+- `_save_records()` — compare run courante aux records, met à jour et sauvegarde ; appelée dans `_on_player_game_over()`
+- `_load_records()` — chargée dans `_ready()`
+- `weapons.active_weapon_id` (game_weapons.gd) — mis à jour dans `fire()` pour tracker l'arme qui tue
+- L'arme préférée globale (`fav_weapon`) est celle avec le plus de kills cumulés toutes runs.
+
 ### Lore inter-salles (issue #26)
 `LORE_TEXTS` (const dans game.gd) mappe numéro de salle → texte de pensée du héros (salles 1–15).
 Pendant `_play_door_animation()`, `_show_lore_text(room_num)` est lancé sans `await` (coroutine concurrente).
