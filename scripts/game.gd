@@ -1,5 +1,5 @@
 extends Node
-# Dernière mise à jour : 2026-04-21
+# Dernière mise à jour : 2026-04-22
 
 # ── Grille ───────────────────────────────────────────────────────
 const LANES    = 5
@@ -37,6 +37,8 @@ const WEAPON_DEFS = {
 	"sismique":   {"name": "Sismique",   "base_dmg": 9,  "cd": 3.0,  "desc": "2 dernières rangées, toutes files"},
 }
 
+const BARRICADE_HP = 60
+
 # ── État ─────────────────────────────────────────────────────────
 var player_lane : int  = 2
 var player_hp   : int  = 100
@@ -55,6 +57,7 @@ var leveling_up : bool = false
 var active_weapons : Array = [{"id": "arc", "level": 1, "acc": 0.0}]
 var grid : Array = []
 var active_gems : Array = []
+var obstacles : Array = []   # [{row, lane, type, hp, node, hp_bar}]
 
 var tick_acc : float = 0.0
 var tick_interval : float = 1.0
@@ -132,6 +135,7 @@ func _start_room(num: int):
 		if is_instance_valid(g.node): g.node.queue_free()
 	active_gems.clear()
 	_init_grid()
+	_clear_obstacles()
 	hud.update_room(room_num)
 	hud.hide_door()
 
@@ -139,6 +143,7 @@ func _start_room(num: int):
 	monsters_remaining = composition.size()
 	print("[SALLE %d] Démarrage — %d monstres à tuer — composition: %s" % [num, monsters_remaining, composition])
 	_spawn_wave(composition)
+	_place_obstacles()
 
 func _get_composition(room: int) -> Array:
 	if ROOM_WAVES.has(room):
@@ -226,14 +231,32 @@ func _do_tick():
 				# Dans tous les cas : revient doublé en haut de sa file
 				_on_monster_escaped(l, mtype)
 			else:
-				# Si bloqué par un autre monstre, reste sur place
-				if grid[new_row][l] == null:
+				# Tenter d'avancer dans la même colonne
+				if not _cell_blocked(new_row, l):
 					grid[new_row][l] = m
 					grid[r][l] = null
 					m.grid_row  = new_row
 					m.grid_lane = l
 					var tw = create_tween()
 					tw.tween_property(m, "position", grid_pos(new_row, l), 0.25)
+				else:
+					# Bloqué par obstacle ou ennemi — tenter une colonne adjacente
+					# TODO: adapter les offsets de direction à enemy_direction pour le mouvement périmétrique futur
+					var dirs = [-1, 1]
+					dirs.shuffle()
+					var moved = false
+					for d in dirs:
+						var adj = l + d
+						if adj >= 0 and adj < LANES and not _cell_blocked(new_row, adj):
+							grid[new_row][adj] = m
+							grid[r][l] = null
+							m.grid_row  = new_row
+							m.grid_lane = adj
+							var tw = create_tween()
+							tw.tween_property(m, "position", grid_pos(new_row, adj), 0.25)
+							moved = true
+							break
+					# Si les deux adjacents sont bloqués, le monstre attend ce tick
 
 func _on_monster_escaped(lane: int, mtype: String):
 	spawns_in_flight += 1
@@ -275,8 +298,16 @@ func _fire_weapon(w: Dictionary):
 		"givre":      _w_givre(w)
 		"sismique":   _w_sismique(w)
 
+# Armes à tir direct — bloquées par les obstacles, peuvent endommager les barricades
 func _w_arc(w: Dictionary):
 	for r in range(ROWS - 1, -1, -1):
+		var obs = _get_obstacle(r, player_lane)
+		if not obs.is_empty():
+			var t = 0.15 + r * 0.02
+			_shoot_arrow(player_lane, r, t, Color(0.95, 0.85, 0.3))
+			await get_tree().create_timer(t).timeout
+			_damage_obstacle(obs, _get_dmg(w))
+			return
 		if grid[r][player_lane] != null:
 			var m = grid[r][player_lane]
 			var t = 0.15 + r * 0.02
@@ -289,6 +320,12 @@ func _w_arbalete(w: Dictionary):
 	var hit = 0
 	for r in range(ROWS - 1, -1, -1):
 		if hit >= 2: break
+		var obs = _get_obstacle(r, player_lane)
+		if not obs.is_empty():
+			_shoot_arrow(player_lane, r, 0.18 + r * 0.015, Color(0.6, 0.6, 1.0), 5.0)
+			await get_tree().create_timer(0.18 + r * 0.015).timeout
+			_damage_obstacle(obs, _get_dmg(w))
+			return
 		if grid[r][player_lane] != null:
 			var m = grid[r][player_lane]
 			_shoot_arrow(player_lane, r, 0.18 + r * 0.015, Color(0.6, 0.6, 1.0), 5.0)
@@ -298,11 +335,17 @@ func _w_arbalete(w: Dictionary):
 
 func _w_dague(w: Dictionary):
 	for r in range(ROWS - 1, -1, -1):
+		var obs = _get_obstacle(r, player_lane)
+		if not obs.is_empty():
+			_show_slash(player_lane, r)
+			_damage_obstacle(obs, _get_dmg(w))
+			return
 		if grid[r][player_lane] != null:
 			_show_slash(player_lane, r)
 			_deal_and_check(grid[r][player_lane], r, player_lane, _get_dmg(w))
 			return
 
+# Armes de zone — ignorent les obstacles mais peuvent endommager les barricades
 func _w_bombe(w: Dictionary):
 	for l in [player_lane - 1, player_lane, player_lane + 1]:
 		if l < 0 or l >= LANES: continue
@@ -312,9 +355,17 @@ func _w_bombe(w: Dictionary):
 				await get_tree().create_timer(0.1).timeout
 				if grid[r][l] != null: _deal_and_check(grid[r][l], r, l, _get_dmg(w))
 				break
+		for obs in obstacles.duplicate():
+			if obs.lane == l and obs.type == "barricade":
+				_damage_obstacle(obs, _get_dmg(w))
 
 func _w_eclair(w: Dictionary):
 	for r in range(ROWS - 1, -1, -1):
+		var obs = _get_obstacle(r, player_lane)
+		if not obs.is_empty():
+			_show_lightning(player_lane, r)
+			_damage_obstacle(obs, _get_dmg(w))
+			return
 		if grid[r][player_lane] != null:
 			_show_lightning(player_lane, r)
 			_deal_and_check(grid[r][player_lane], r, player_lane, _get_dmg(w))
@@ -323,12 +374,22 @@ func _w_tourbillon(w: Dictionary):
 	_show_whirlwind()
 	for l in LANES:
 		for r in range(ROWS - 1, -1, -1):
+			var obs = _get_obstacle(r, l)
 			if grid[r][l] != null:
 				_deal_and_check(grid[r][l], r, l, _get_dmg(w))
+				break
+			elif not obs.is_empty() and obs.type == "barricade":
+				_damage_obstacle(obs, _get_dmg(w))
 				break
 
 func _w_givre(w: Dictionary):
 	for r in range(ROWS - 1, -1, -1):
+		var obs = _get_obstacle(r, player_lane)
+		if not obs.is_empty():
+			_shoot_arrow(player_lane, r, 0.2, Color(0.4, 0.85, 1.0), 3.0)
+			await get_tree().create_timer(0.2).timeout
+			_damage_obstacle(obs, _get_dmg(w))
+			return
 		if grid[r][player_lane] != null:
 			var m = grid[r][player_lane]
 			_shoot_arrow(player_lane, r, 0.2, Color(0.4, 0.85, 1.0), 3.0)
@@ -344,6 +405,9 @@ func _w_sismique(w: Dictionary):
 		for l in LANES:
 			if r >= 0 and grid[r][l] != null:
 				_deal_and_check(grid[r][l], r, l, _get_dmg(w))
+	for obs in obstacles.duplicate():
+		if obs.row >= ROWS - 2 and obs.type == "barricade":
+			_damage_obstacle(obs, _get_dmg(w))
 
 # ── Combat ───────────────────────────────────────────────────────
 func _deal_and_check(m: Node2D, _row: int, _lane: int, dmg: int):
@@ -506,6 +570,140 @@ func _input(event: InputEvent):
 		_move_player(1)
 	elif event.is_action_pressed("next_room") and room_clear:
 		_start_room(room_num + 1)
+
+# ── Obstacles ────────────────────────────────────────────────────
+func _get_obstacle(row: int, lane: int) -> Dictionary:
+	for obs in obstacles:
+		if obs.row == row and obs.lane == lane:
+			return obs
+	return {}
+
+func _cell_blocked(row: int, lane: int) -> bool:
+	if row < 0 or row >= ROWS or lane < 0 or lane >= LANES: return true
+	if grid[row][lane] != null: return true
+	for obs in obstacles:
+		if obs.row == row and obs.lane == lane: return true
+	return false
+
+func _clear_obstacles():
+	for obs in obstacles:
+		if is_instance_valid(obs.node): obs.node.queue_free()
+	obstacles.clear()
+
+func _place_obstacles():
+	var count = 0
+	var max_rocks = 0
+	if room_num >= 10:
+		count = randi_range(3, 4)
+		max_rocks = 2
+	elif room_num >= 7:
+		count = randi_range(2, 3)
+		max_rocks = 1
+	elif room_num >= 4:
+		count = randi_range(1, 2)
+		max_rocks = 1
+	else:
+		return  # salles 1-3 : aucun obstacle
+
+	# Zone autorisée : colonnes 1, 2, 3 — max 1 obstacle par colonne
+	var valid_lanes = [1, 2, 3]
+	valid_lanes.shuffle()
+	count = min(count, valid_lanes.size())
+
+	var rocks_left = max_rocks
+	for i in count:
+		var lane = valid_lanes[i]
+		var row = randi_range(1, 6)
+		var obs_type = "barricade"
+		if rocks_left > 0 and randf() < 0.5:
+			obs_type = "rock"
+			rocks_left -= 1
+		_create_obstacle(row, lane, obs_type)
+
+func _create_obstacle(row: int, lane: int, type: String):
+	var node = Node2D.new()
+	node.position = grid_pos(row, lane)
+
+	if type == "rock":
+		_build_rock_visual(node)
+	else:
+		_build_barricade_visual(node)
+
+	bg.add_child(node)
+
+	var hp_bar: ColorRect = null
+	if type == "barricade":
+		hp_bar = _create_hp_bar(node)
+
+	obstacles.append({
+		"row": row, "lane": lane, "type": type,
+		"hp": BARRICADE_HP if type == "barricade" else -1,
+		"node": node, "hp_bar": hp_bar
+	})
+
+func _build_rock_visual(node: Node2D):
+	var poly = Polygon2D.new()
+	poly.polygon = PackedVector2Array([
+		Vector2(-42, 12), Vector2(-50, -4), Vector2(-34, -22),
+		Vector2(-10, -28), Vector2(16, -26), Vector2(44, -14),
+		Vector2(48, 4), Vector2(38, 20), Vector2(10, 28),
+		Vector2(-20, 24)
+	])
+	poly.color = Color(0.4, 0.4, 0.4)
+	node.add_child(poly)
+	# Reflet clair pour donner du relief
+	var highlight = Polygon2D.new()
+	highlight.polygon = PackedVector2Array([
+		Vector2(-28, -4), Vector2(-12, -22), Vector2(12, -24), Vector2(22, -14), Vector2(2, -6)
+	])
+	highlight.color = Color(0.58, 0.58, 0.58)
+	node.add_child(highlight)
+
+func _build_barricade_visual(node: Node2D):
+	var hw = (LANE_W - 20) * 0.5
+	var hh = (ROW_H - 20) * 0.5
+	var rect = ColorRect.new()
+	rect.size = Vector2(LANE_W - 20, ROW_H - 20)
+	rect.position = Vector2(-hw, -hh)
+	rect.color = Color(0.55, 0.35, 0.15)
+	node.add_child(rect)
+	# Planches horizontales
+	for i in 3:
+		var plank = Line2D.new()
+		var y = -hh + 8 + i * int((ROW_H - 20 - 10) / 2.0)
+		plank.add_point(Vector2(-hw + 3, y))
+		plank.add_point(Vector2(hw - 3, y))
+		plank.width = 3.0
+		plank.default_color = Color(0.35, 0.22, 0.08)
+		node.add_child(plank)
+
+func _create_hp_bar(node: Node2D) -> ColorRect:
+	var bar_w = LANE_W - 20
+	var hh = (ROW_H - 20) * 0.5
+	var bar_bg = ColorRect.new()
+	bar_bg.size = Vector2(bar_w, 6)
+	bar_bg.position = Vector2(-bar_w * 0.5, -hh - 10)
+	bar_bg.color = Color(0.2, 0.1, 0.05)
+	node.add_child(bar_bg)
+	var bar = ColorRect.new()
+	bar.size = Vector2(bar_w, 6)
+	bar.position = bar_bg.position
+	bar.color = Color(0.8, 0.5, 0.15)
+	node.add_child(bar)
+	return bar
+
+func _damage_obstacle(obs: Dictionary, dmg: int):
+	if obs.type == "rock": return   # indestructible
+	obs.hp -= dmg
+	if is_instance_valid(obs.hp_bar):
+		var pct = clampf(float(obs.hp) / BARRICADE_HP, 0.0, 1.0)
+		obs.hp_bar.size.x = (LANE_W - 20) * pct
+	if obs.hp <= 0:
+		_destroy_obstacle(obs)
+
+func _destroy_obstacle(obs: Dictionary):
+	if is_instance_valid(obs.node): obs.node.queue_free()
+	obstacles.erase(obs)
 
 # ── Visuels d'attaque ────────────────────────────────────────────
 func _shoot_arrow(lane: int, target_row: int, duration: float,

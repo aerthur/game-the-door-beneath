@@ -60,17 +60,21 @@ var game_over          : bool
 var leveling_up        : bool  # true = panel level-up affiché
 var active_weapons     : Array # [{"id": "arc", "level": 1, "acc": 0.0}, ...]
 var grid               : Array # grid[row][lane] = monstre Node2D ou null
+var obstacles          : Array # [{row, lane, type, hp, node, hp_bar}]
 ```
 
 ### Fonctions importantes
-- `_start_room(num)` — démarre une salle, spawne la vague
-- `_do_tick()` — déplace tous les monstres d'une rangée vers le bas
+- `_start_room(num)` — démarre une salle, spawne la vague, place les obstacles
+- `_do_tick()` — déplace tous les monstres (avec contournement des obstacles)
 - `_on_monster_escaped(lane, mtype)` — monstre arrivé en bas → duplique (async)
 - `_on_monster_killed(lane, pos, xp)` — kill confirmé, décrémente compteur
 - `_check_room_clear()` — vérifie si grille vide + aucun spawn en vol → clear
 - `_deal_and_check(m, row, lane, dmg)` — applique dégâts, vérifie mort
 - `_fire_weapon(w)` → dispatch vers `_w_arc`, `_w_arbalete`, etc.
 - `apply_level_up_choice(choice)` — appelée par hud.gd quand le joueur choisit
+- `_place_obstacles()` — place obstacles aléatoires selon la salle
+- `_cell_blocked(row, lane)` — true si case occupée (ennemi ou obstacle)
+- `_damage_obstacle(obs, dmg)` — endommage une barricade, la détruit si hp ≤ 0
 
 ### Grille
 `grid[row][lane]` contient le Node2D du monstre ou `null`.
@@ -134,3 +138,24 @@ Les dégâts scalent avec le niveau : `base_dmg * (1.0 + (level - 1) * 0.5)`
 ### Nouvelle mécanique de jeu
 - Toute la logique de jeu passe par game.gd
 - Le HUD communique avec game.gd via `get_tree().get_first_node_in_group("game")`
+
+## Obstacles (feature #23)
+Obstacles fixes apparaissant dans la grille à partir de la salle 4.
+
+### Types
+- **Rocher** (`"rock"`) : indestructible, bloque ennemis et armes à tir direct
+- **Barricade** (`"barricade"`) : hp=60, destructible, barre de vie visible
+
+### Règles de placement
+- Zone : colonnes 1–3, rangées 1–6 (jamais col 0/4 ni rangées 0/7)
+- Max 1 obstacle par colonne
+- Salles 1–3 : 0 obstacle | Salles 4–6 : 1–2 (max 1 rocher) | Salles 7–9 : 2–3 (max 1 rocher) | Salle 10+ : 3–4 (max 2 rochers)
+
+### Interaction armes
+- Bloquées par obstacles (tir direct) : arc, arbalète, dague, éclair, givre
+- Ignorent obstacles mais endommagent barricades (zone) : bombe, tourbillon, sismique
+
+### Comportement ennemis
+- Si bloqué par obstacle en avant : tente colonne adjacente (aléatoire gauche/droite)
+- Si les deux adjacentes sont bloquées : attend ce tick
+- TODO dans `_do_tick()` : adapter les offsets à `enemy_direction` pour le futur mouvement périmétrique
