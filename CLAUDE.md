@@ -60,17 +60,23 @@ var game_over          : bool
 var leveling_up        : bool  # true = panel level-up affiché
 var active_weapons     : Array # [{"id": "arc", "level": 1, "acc": 0.0}, ...]
 var grid               : Array # grid[row][lane] = monstre Node2D ou null
+var run_stats          : Dictionary # stats de la run en cours (score, max_room, time, kills_by_type, kills_by_weapon)
+var run_time           : float      # durée de la run en secondes (accumulée dans _process)
+var records            : Dictionary # meilleurs records persistés (chargés depuis user://records.cfg)
 ```
 
 ### Fonctions importantes
-- `_start_room(num)` — démarre une salle, spawne la vague
+- `_start_room(num)` — démarre une salle, spawne la vague ; appelle `_init_run_stats()` si num==1
 - `_do_tick()` — déplace tous les monstres d'une rangée vers le bas
 - `_on_monster_escaped(lane, mtype)` — monstre arrivé en bas → duplique (async)
-- `_on_monster_killed(lane, pos, xp)` — kill confirmé, décrémente compteur
+- `_on_monster_killed(lane, pos, xp, mtype, weapon_id)` — kill confirmé, met à jour run_stats
 - `_check_room_clear()` — vérifie si grille vide + aucun spawn en vol → clear
-- `_deal_and_check(m, row, lane, dmg)` — applique dégâts, vérifie mort
+- `_deal_and_check(m, row, lane, dmg, weapon_id)` — applique dégâts, vérifie mort, propage weapon_id
 - `_fire_weapon(w)` → dispatch vers `_w_arc`, `_w_arbalete`, etc.
 - `apply_level_up_choice(choice)` — appelée par hud.gd quand le joueur choisit
+- `_init_run_stats()` — réinitialise run_stats et run_time pour une nouvelle run
+- `_load_records()` — charge les records depuis `user://records.cfg` (appelée dans _ready)
+- `_save_records()` — compare run_stats aux records, sauvegarde le meilleur (appelée au game over)
 
 ### Grille
 `grid[row][lane]` contient le Node2D du monstre ou `null`.

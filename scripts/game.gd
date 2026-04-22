@@ -56,6 +56,10 @@ var active_weapons : Array = [{"id": "arc", "level": 1, "acc": 0.0}]
 var grid : Array = []
 var active_gems : Array = []
 
+var run_stats  : Dictionary = {}
+var run_time   : float = 0.0
+var records    : Dictionary = {}
+
 var tick_acc : float = 0.0
 var tick_interval : float = 1.0
 
@@ -72,6 +76,7 @@ var gem_scene   = preload("res://scenes/gem.tscn")
 # ═════════════════════════════════════════════════════════════════
 func _ready():
 	add_to_group("game")
+	_load_records()
 	_init_grid()
 	_draw_background()
 	_place_player()
@@ -125,6 +130,9 @@ func _move_player(dir: int):
 # ── Salle ────────────────────────────────────────────────────────
 func _start_room(num: int):
 	room_num   = num
+	if num == 1:
+		_init_run_stats()
+	run_stats["max_room"] = num
 	room_clear       = false
 	spawns_in_flight = 0
 	for child in monsters_node.get_children(): child.queue_free()
@@ -193,6 +201,8 @@ func _find_spawn_lane(preferred: int) -> int:
 func _process(delta: float):
 	if game_over or leveling_up: return
 	if room_clear: return   # attente ESPACE, pas de ticks ni tirs
+
+	run_time += delta
 
 	tick_acc += delta
 	if tick_acc >= tick_interval:
@@ -282,7 +292,7 @@ func _w_arc(w: Dictionary):
 			var t = 0.15 + r * 0.02
 			_shoot_arrow(player_lane, r, t, Color(0.95, 0.85, 0.3))
 			await get_tree().create_timer(t).timeout
-			if is_instance_valid(m): _deal_and_check(m, r, player_lane, _get_dmg(w))
+			if is_instance_valid(m): _deal_and_check(m, r, player_lane, _get_dmg(w), w.id)
 			return
 
 func _w_arbalete(w: Dictionary):
@@ -293,14 +303,14 @@ func _w_arbalete(w: Dictionary):
 			var m = grid[r][player_lane]
 			_shoot_arrow(player_lane, r, 0.18 + r * 0.015, Color(0.6, 0.6, 1.0), 5.0)
 			await get_tree().create_timer(0.18 + r * 0.015).timeout
-			if is_instance_valid(m): _deal_and_check(m, r, player_lane, _get_dmg(w))
+			if is_instance_valid(m): _deal_and_check(m, r, player_lane, _get_dmg(w), w.id)
 			hit += 1
 
 func _w_dague(w: Dictionary):
 	for r in range(ROWS - 1, -1, -1):
 		if grid[r][player_lane] != null:
 			_show_slash(player_lane, r)
-			_deal_and_check(grid[r][player_lane], r, player_lane, _get_dmg(w))
+			_deal_and_check(grid[r][player_lane], r, player_lane, _get_dmg(w), w.id)
 			return
 
 func _w_bombe(w: Dictionary):
@@ -310,21 +320,21 @@ func _w_bombe(w: Dictionary):
 			if grid[r][l] != null:
 				_show_explosion(l, r)
 				await get_tree().create_timer(0.1).timeout
-				if grid[r][l] != null: _deal_and_check(grid[r][l], r, l, _get_dmg(w))
+				if grid[r][l] != null: _deal_and_check(grid[r][l], r, l, _get_dmg(w), w.id)
 				break
 
 func _w_eclair(w: Dictionary):
 	for r in range(ROWS - 1, -1, -1):
 		if grid[r][player_lane] != null:
 			_show_lightning(player_lane, r)
-			_deal_and_check(grid[r][player_lane], r, player_lane, _get_dmg(w))
+			_deal_and_check(grid[r][player_lane], r, player_lane, _get_dmg(w), w.id)
 
 func _w_tourbillon(w: Dictionary):
 	_show_whirlwind()
 	for l in LANES:
 		for r in range(ROWS - 1, -1, -1):
 			if grid[r][l] != null:
-				_deal_and_check(grid[r][l], r, l, _get_dmg(w))
+				_deal_and_check(grid[r][l], r, l, _get_dmg(w), w.id)
 				break
 
 func _w_givre(w: Dictionary):
@@ -335,7 +345,7 @@ func _w_givre(w: Dictionary):
 			await get_tree().create_timer(0.2).timeout
 			if is_instance_valid(m):
 				m.freeze(2)
-				_deal_and_check(m, r, player_lane, _get_dmg(w))
+				_deal_and_check(m, r, player_lane, _get_dmg(w), w.id)
 			return
 
 func _w_sismique(w: Dictionary):
@@ -343,12 +353,13 @@ func _w_sismique(w: Dictionary):
 	for r in [ROWS - 1, ROWS - 2]:
 		for l in LANES:
 			if r >= 0 and grid[r][l] != null:
-				_deal_and_check(grid[r][l], r, l, _get_dmg(w))
+				_deal_and_check(grid[r][l], r, l, _get_dmg(w), w.id)
 
 # ── Combat ───────────────────────────────────────────────────────
-func _deal_and_check(m: Node2D, _row: int, _lane: int, dmg: int):
+func _deal_and_check(m: Node2D, _row: int, _lane: int, dmg: int, weapon_id: String = ""):
 	if not is_instance_valid(m): return
 	var xp_val = m.xp_value
+	var mtype  = m.monster_type
 	m.take_damage(dmg)
 	if m.hp <= 0:
 		# Utiliser la position ACTUELLE du monstre (pas celle capturée au moment du tir)
@@ -357,13 +368,17 @@ func _deal_and_check(m: Node2D, _row: int, _lane: int, dmg: int):
 		grid[row][lane] = null
 		var pos = m.position
 		m.queue_free()
-		_on_monster_killed(lane, pos, xp_val)
+		_on_monster_killed(lane, pos, xp_val, mtype, weapon_id)
 
-func _on_monster_killed(lane: int, kill_pos: Vector2, xp_val: int):
+func _on_monster_killed(lane: int, kill_pos: Vector2, xp_val: int, mtype: String = "", weapon_id: String = ""):
 	score += 10 * room_num
 	monsters_remaining -= 1
 	print("[KILL] File %d — remaining: %d — grid_empty: %s — in_flight: %d" % [lane+1, monsters_remaining, _grid_empty(), spawns_in_flight])
 	hud.update_score(score)
+	if mtype != "" and run_stats.has("kills_by_type"):
+		run_stats["kills_by_type"][mtype] = run_stats["kills_by_type"].get(mtype, 0) + 1
+	if weapon_id != "" and run_stats.has("kills_by_weapon"):
+		run_stats["kills_by_weapon"][weapon_id] = run_stats["kills_by_weapon"].get(weapon_id, 0) + 1
 	_spawn_gem(lane, kill_pos, xp_val)
 	_check_room_clear()
 
@@ -494,6 +509,7 @@ func _hit_player(dmg: int):
 	player_node.modulate = Color.WHITE
 	if player_hp <= 0:
 		game_over = true
+		_save_records()
 		hud.show_game_over(score, room_num)
 
 # ── Input ────────────────────────────────────────────────────────
@@ -575,3 +591,75 @@ func _show_quake():
 		tw.tween_property(cam, "offset", Vector2(0, 0), 0.05)
 	await get_tree().create_timer(0.20).timeout
 	if is_instance_valid(rect): rect.queue_free()
+
+# ── Records ──────────────────────────────────────────────────────
+func _init_run_stats():
+	run_time = 0.0
+	var kills_by_weapon : Dictionary = {}
+	for wid in WEAPON_DEFS.keys():
+		kills_by_weapon[wid] = 0
+	run_stats = {
+		"score":           0,
+		"max_room":        1,
+		"time":            0.0,
+		"kills_by_type":   {"g": 0, "b": 0, "r": 0},
+		"kills_by_weapon": kills_by_weapon,
+	}
+
+func _load_records():
+	var kills_by_weapon : Dictionary = {}
+	for wid in WEAPON_DEFS.keys():
+		kills_by_weapon[wid] = 0
+	records = {
+		"best_score":            0,
+		"best_room":             0,
+		"best_time":             0.0,
+		"total_kills_by_type":   {"g": 0, "b": 0, "r": 0},
+		"total_kills_by_weapon": kills_by_weapon,
+		"fav_weapon":            "",
+	}
+	var cfg = ConfigFile.new()
+	if cfg.load("user://records.cfg") != OK:
+		return
+	records["best_score"] = cfg.get_value("records", "best_score", 0)
+	records["best_room"]  = cfg.get_value("records", "best_room",  0)
+	records["best_time"]  = cfg.get_value("records", "best_time",  0.0)
+	records["fav_weapon"] = cfg.get_value("records", "fav_weapon", "")
+	var kbt = cfg.get_value("records", "total_kills_by_type", {})
+	for t in records["total_kills_by_type"]:
+		records["total_kills_by_type"][t] = kbt.get(t, 0)
+	var kbw = cfg.get_value("records", "total_kills_by_weapon", {})
+	for wid in records["total_kills_by_weapon"]:
+		records["total_kills_by_weapon"][wid] = kbw.get(wid, 0)
+
+func _save_records():
+	run_stats["score"] = score
+	run_stats["time"]  = run_time
+
+	records["best_score"] = max(records["best_score"], run_stats["score"])
+	records["best_room"]  = max(records["best_room"],  run_stats["max_room"])
+	records["best_time"]  = max(records["best_time"],  run_stats["time"])
+
+	for t in run_stats["kills_by_type"]:
+		records["total_kills_by_type"][t] += run_stats["kills_by_type"][t]
+	for wid in run_stats["kills_by_weapon"]:
+		if records["total_kills_by_weapon"].has(wid):
+			records["total_kills_by_weapon"][wid] += run_stats["kills_by_weapon"][wid]
+
+	var fav = ""
+	var fav_count = 0
+	for wid in records["total_kills_by_weapon"]:
+		if records["total_kills_by_weapon"][wid] > fav_count:
+			fav_count = records["total_kills_by_weapon"][wid]
+			fav = wid
+	records["fav_weapon"] = fav
+
+	var cfg = ConfigFile.new()
+	cfg.set_value("records", "best_score",            records["best_score"])
+	cfg.set_value("records", "best_room",             records["best_room"])
+	cfg.set_value("records", "best_time",             records["best_time"])
+	cfg.set_value("records", "total_kills_by_type",   records["total_kills_by_type"])
+	cfg.set_value("records", "total_kills_by_weapon", records["total_kills_by_weapon"])
+	cfg.set_value("records", "fav_weapon",            records["fav_weapon"])
+	cfg.save("user://records.cfg")
+	print("[RECORDS] score=%d salle=%d temps=%.0fs arme_fav=%s" % [records["best_score"], records["best_room"], records["best_time"], records["fav_weapon"]])
