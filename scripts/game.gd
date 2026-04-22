@@ -22,6 +22,10 @@ var active_weapons : Array = [{"id": "arc", "level": 1, "acc": 0.0}]
 var grid : Array = []
 var active_gems : Array = []
 
+var run_stats   : Dictionary = {}
+var records     : Dictionary = {}
+var _run_start_ms : int = 0
+
 var tick_acc : float = 0.0
 var tick_interval : float = 1.0
 
@@ -39,6 +43,7 @@ var gem_scene   = preload("res://scenes/gem.tscn")
 # ═════════════════════════════════════════════════════════════════
 func _ready():
 	add_to_group("game")
+	_load_records()
 	visuals.bg = bg
 	enemies.monsters_node = monsters_node
 	enemies.grid = grid
@@ -93,6 +98,8 @@ func _draw_background():
 # ── Joueur ───────────────────────────────────────────────────────
 
 func _start_room(num: int):
+	if num == 1:
+		_init_run_stats()
 	room_num   = num
 	room_clear       = false
 	spawns_in_flight = 0
@@ -215,6 +222,11 @@ func _on_monster_killed(lane: int, kill_pos: Vector2, xp_val: int, mtype: String
 	var gold_table = {"g": 5, "b": 12, "r": 25}
 	_add_gold(gold_table.get(mtype, 0))
 	monsters_remaining -= 1
+	if run_stats.has("kills"):
+		run_stats.kills[mtype] = run_stats.kills.get(mtype, 0) + 1
+		var wid = weapons.active_weapon_id
+		if wid != "":
+			run_stats.weapon_kills[wid] = run_stats.weapon_kills.get(wid, 0) + 1
 	print("[KILL] File %d — remaining: %d — grid_empty: %s — in_flight: %d" % [lane+1, monsters_remaining, _grid_empty(), spawns_in_flight])
 	visuals.show_gold_float(kill_pos, gold_table.get(mtype, 0))
 	_spawn_gem(lane, kill_pos, xp_val)
@@ -353,4 +365,98 @@ func _input(event: InputEvent):
 # ── Callback game over joueur ───────────────────────────────────
 func _on_player_game_over():
 	game_over = true
+	_save_records()
 	hud.show_game_over(gold_total_earned, room_num)
+
+# ── Records ──────────────────────────────────────────────────────
+func _init_run_stats():
+	_run_start_ms = Time.get_ticks_msec()
+	run_stats = {
+		"score":        0,
+		"best_room":    1,
+		"run_time":     0,
+		"kills":        {"g": 0, "b": 0, "r": 0},
+		"weapon_kills": {}
+	}
+	for wid in GameData.WEAPON_DEFS.keys():
+		run_stats.weapon_kills[wid] = 0
+
+func _save_records():
+	run_stats.score     = gold_total_earned
+	run_stats.best_room = room_num
+	run_stats.run_time  = int((Time.get_ticks_msec() - _run_start_ms) / 1000)
+
+	var best_score = records.get("best_score", 0)
+	var best_room  = records.get("best_room",  0)
+	var best_time  = records.get("best_time",  0)
+
+	var total_kills   : Dictionary = records.get("total_kills",   {"g": 0, "b": 0, "r": 0})
+	var weapon_kills  : Dictionary = records.get("weapon_kills",  {})
+
+	if run_stats.score    > best_score: best_score = run_stats.score
+	if run_stats.best_room > best_room: best_room  = run_stats.best_room
+	if run_stats.run_time  > best_time: best_time  = run_stats.run_time
+
+	for t in run_stats.kills:
+		total_kills[t] = total_kills.get(t, 0) + run_stats.kills[t]
+	for wid in run_stats.weapon_kills:
+		weapon_kills[wid] = weapon_kills.get(wid, 0) + run_stats.weapon_kills[wid]
+
+	var fav = ""
+	var fav_count = 0
+	for wid in weapon_kills:
+		if weapon_kills[wid] > fav_count:
+			fav_count = weapon_kills[wid]
+			fav = wid
+
+	records = {
+		"best_score":   best_score,
+		"best_room":    best_room,
+		"best_time":    best_time,
+		"total_kills":  total_kills,
+		"weapon_kills": weapon_kills,
+		"fav_weapon":   fav
+	}
+
+	var cfg = ConfigFile.new()
+	cfg.set_value("records", "best_score",  records.best_score)
+	cfg.set_value("records", "best_room",   records.best_room)
+	cfg.set_value("records", "best_time",   records.best_time)
+	cfg.set_value("records", "fav_weapon",  records.fav_weapon)
+	for t in records.total_kills:
+		cfg.set_value("kills", t, records.total_kills[t])
+	for wid in records.weapon_kills:
+		cfg.set_value("weapon_kills", wid, records.weapon_kills[wid])
+	cfg.save("user://records.cfg")
+	print("[RECORDS] Sauvegarde — score: %d  salle: %d  temps: %ds  arme fav: %s" % [best_score, best_room, best_time, fav])
+
+func _load_records():
+	var cfg = ConfigFile.new()
+	if cfg.load("user://records.cfg") != OK:
+		records = {
+			"best_score":   0,
+			"best_room":    0,
+			"best_time":    0,
+			"total_kills":  {"g": 0, "b": 0, "r": 0},
+			"weapon_kills": {},
+			"fav_weapon":   ""
+		}
+		return
+
+	var total_kills : Dictionary = {"g": 0, "b": 0, "r": 0}
+	for t in total_kills.keys():
+		total_kills[t] = cfg.get_value("kills", t, 0)
+
+	var weapon_kills : Dictionary = {}
+	for wid in GameData.WEAPON_DEFS.keys():
+		weapon_kills[wid] = cfg.get_value("weapon_kills", wid, 0)
+
+	records = {
+		"best_score":   cfg.get_value("records", "best_score",  0),
+		"best_room":    cfg.get_value("records", "best_room",   0),
+		"best_time":    cfg.get_value("records", "best_time",   0),
+		"total_kills":  total_kills,
+		"weapon_kills": weapon_kills,
+		"fav_weapon":   cfg.get_value("records", "fav_weapon",  "")
+	}
+	print("[RECORDS] Chargé — meilleur score: %d  salle: %d" % [records.best_score, records.best_room])
