@@ -55,7 +55,7 @@ func update_weapons(weapons: Array):
 		if child.name != "Title" and child.name != "WeaponIcon": child.queue_free()
 
 	for w in weapons:
-		var def = get_tree().get_first_node_in_group("game").WEAPON_DEFS[w.id]
+		var def = GameData.WEAPON_DEFS[w.id]
 		var icon_str = def.get("icon", "")
 		var lbl = Label.new()
 		lbl.text = "%s %s  Nv.%d\n  dmg: %d  cd: %.1fs" % [
@@ -86,7 +86,7 @@ func show_level_up(choices: Array):
 
 	for i in choices.size():
 		var choice = choices[i]
-		var def = game.WEAPON_DEFS[choice.weapon_id]
+		var def = GameData.WEAPON_DEFS[choice.weapon_id]
 
 		var card = PanelContainer.new()
 		card.custom_minimum_size = Vector2(240, 180)
@@ -169,4 +169,4 @@ func show_game_over(s: int, r: int):
 	$GameOver/Panel/VBox/LRoom.text  = "Salle atteinte  :  %d" % r
 
 func _on_restart_pressed():
-	get_tree().reload_current_scene()
+	get_tree().reload_current_
