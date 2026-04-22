@@ -131,6 +131,15 @@ Les dégâts scalent avec le niveau : `base_dmg * (1.0 + (level - 1) * 0.5)`
 3. Preload dans game.gd, ajouter le case dans `_spawn_monster()`
 4. Ajouter dans `ROOM_WAVES` si nécessaire
 
+#### Taille de référence des gobelins (issue #4)
+Tous les gobelins partagent la même géométrie de base (monster_blob.tscn). Seule la couleur change.
+Référence à respecter pour tout nouveau gobelin :
+- Head : offset_left=-18, offset_top=-28, offset_right=18, offset_bottom=2
+- Body : offset_left=-14, offset_top=-2, offset_right=14, offset_bottom=22
+- Ears : width=10, top=-32, bottom=-16 (gauche: left=-26/right=-16 ; droite: left=16/right=26)
+- ArmLeft : offset_left=-26, offset_top=2, offset_right=-14, offset_bottom=16
+- ArmRight : offset_left=14, offset_top=2, offset_right=26, offset_bottom=16
+
 ### Nouvelle mécanique de jeu
 - Toute la logique de jeu passe par game.gd
 - Le HUD communique avec game.gd via `get_tree().get_first_node_in_group("game")`
