@@ -390,7 +390,111 @@ func _grid_empty() -> bool:
 
 func _room_cleared():
 	room_clear = true
+	await _play_door_animation()
 	hud.show_door()
+
+func _get_room_xp_bonus(room: int) -> int:
+	var table = {1: 30, 2: 60, 3: 100, 4: 150, 5: 200, 6: 260, 7: 330, 8: 410, 9: 500}
+	if table.has(room):
+		return table[room]
+	return 500 + (room - 10) * 80
+
+func _play_door_animation():
+	var door_w  = 200
+	var door_h  = 280
+	var cx      = 640
+	var cy      = 340
+	var door_x  = cx - door_w / 2
+	var door_y  = cy - door_h / 2
+
+	var stone = ColorRect.new()
+	stone.size     = Vector2(door_w + 20, door_h + 20)
+	stone.position = Vector2(door_x - 10, door_y - 10)
+	stone.color    = Color(0.45, 0.42, 0.40)
+	bg.add_child(stone)
+
+	var glow = ColorRect.new()
+	glow.size     = Vector2(door_w, door_h)
+	glow.position = Vector2(door_x, door_y)
+	glow.color    = Color(1.0, 0.85, 0.2, 0.0)
+	bg.add_child(glow)
+
+	var left_panel = ColorRect.new()
+	left_panel.size     = Vector2(door_w / 2, door_h)
+	left_panel.position = Vector2(door_x, door_y)
+	left_panel.color    = Color(0.35, 0.2, 0.1)
+	bg.add_child(left_panel)
+
+	var right_panel = ColorRect.new()
+	right_panel.size     = Vector2(door_w / 2, door_h)
+	right_panel.position = Vector2(cx, door_y)
+	right_panel.color    = Color(0.35, 0.2, 0.1)
+	bg.add_child(right_panel)
+
+	_play_jackpot_sound()
+
+	var tw = create_tween()
+	tw.tween_property(left_panel,  "position:x", float(door_x - door_w / 2), 0.8)
+	tw.parallel().tween_property(right_panel, "position:x", float(cx + door_w / 2), 0.8)
+	tw.parallel().tween_property(glow, "color", Color(1.0, 0.85, 0.2, 0.6), 0.4)
+	await tw.finished
+
+	var xp_bonus = _get_room_xp_bonus(room_num)
+	_add_xp(xp_bonus)
+
+	var xp_lbl = Label.new()
+	xp_lbl.text = "+%d XP" % xp_bonus
+	xp_lbl.position = Vector2(cx - 55, cy - 20)
+	xp_lbl.add_theme_font_size_override("font_size", 40)
+	xp_lbl.add_theme_color_override("font_color", Color(1.0, 0.85, 0.2))
+	bg.add_child(xp_lbl)
+
+	var tw2 = create_tween()
+	tw2.tween_property(xp_lbl, "position:y", float(cy - 90), 0.9)
+	tw2.parallel().tween_property(xp_lbl, "modulate", Color(1, 1, 1, 0), 0.9)
+	await tw2.finished
+	if is_instance_valid(xp_lbl): xp_lbl.queue_free()
+
+	var tw3 = create_tween()
+	tw3.tween_property(stone,       "modulate", Color(1, 1, 1, 0), 0.4)
+	tw3.parallel().tween_property(glow,        "modulate", Color(1, 1, 1, 0), 0.4)
+	tw3.parallel().tween_property(left_panel,  "modulate", Color(1, 1, 1, 0), 0.4)
+	tw3.parallel().tween_property(right_panel, "modulate", Color(1, 1, 1, 0), 0.4)
+	await tw3.finished
+
+	for n in [stone, glow, left_panel, right_panel]:
+		if is_instance_valid(n): n.queue_free()
+
+func _play_jackpot_sound():
+	var player = AudioStreamPlayer.new()
+	add_child(player)
+
+	var stream = AudioStreamGenerator.new()
+	stream.mix_rate     = 22050.0
+	stream.buffer_length = 0.6
+	player.stream    = stream
+	player.volume_db = -8.0
+	player.play()
+
+	var playback = player.get_stream_playback() as AudioStreamGeneratorPlayback
+	if playback == null:
+		player.queue_free()
+		return
+
+	var sample_rate  = 22050.0
+	var notes        = [523.0, 659.0, 784.0, 1047.0]
+	var note_duration = 0.1
+
+	for note_freq in notes:
+		var n_samples = int(sample_rate * note_duration)
+		for i in n_samples:
+			var t        = float(i) / sample_rate
+			var envelope = 1.0 - float(i) / float(n_samples)
+			var sample   = sin(TAU * note_freq * t) * 0.25 * envelope
+			playback.push_frame(Vector2(sample, sample))
+
+	await get_tree().create_timer(0.55).timeout
+	if is_instance_valid(player): player.queue_free()
 
 # ── Gemmes ───────────────────────────────────────────────────────
 func _spawn_gem(lane: int, pos: Vector2, xp_val: int):
