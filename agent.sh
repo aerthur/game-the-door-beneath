@@ -29,6 +29,7 @@ REPO="aerthur/game-the-door-beneath"
 REPO_DIR="/home/claude/game-the-door-beneath"
 MAIN_BRANCH="main"
 STATE_FILE="$REPO_DIR/.agent_state.json"
+PENDING_RESTART_FILE="$REPO_DIR/.agent_restart_pending"
 MAX_ISSUES=10   # sécurité : max d'issues par exécution
 LOG_PREFIX="[$(date '+%Y-%m-%d %H:%M:%S')] [agent]"
 
@@ -165,7 +166,10 @@ handle_restart_issues() {
 \`#$NUM\` — $TITLE
 Branche \`$OLD_BRANCH\` supprimée. Réimplémentation au prochain cycle."
 
-    log "Restart #$NUM préparé."
+    # Mémoriser l'issue pour que process_issue() la reprenne directement
+    # (évite le délai de propagation de l'index GitHub Search)
+    echo "$NUM" >> "$PENDING_RESTART_FILE"
+    log "Restart #$NUM préparé — en attente de traitement direct."
   done
 }
 
@@ -204,6 +208,31 @@ process_issue() {
     git checkout "$MAIN_BRANCH"
     git pull --ff-only origin "$MAIN_BRANCH"
 
+    # Priorité : issues restartées ce cycle (évite le délai GitHub Search)
+    if [ -f "$PENDING_RESTART_FILE" ]; then
+      PENDING_NUM=$(head -1 "$PENDING_RESTART_FILE")
+      # Retirer cette ligne du fichier
+      sed -i '1d' "$PENDING_RESTART_FILE"
+      [ ! -s "$PENDING_RESTART_FILE" ] && rm -f "$PENDING_RESTART_FILE"
+      if [ -n "$PENDING_NUM" ]; then
+        log "Reprise directe de l'issue restartée #$PENDING_NUM (bypass search)"
+        ISSUE_NUM="$PENDING_NUM"
+        ISSUE_TITLE=$(gh issue view "$PENDING_NUM" --repo "$REPO" --json title -q '.title' 2>/dev/null || echo "Issue #$PENDING_NUM")
+        ISSUE_BODY=$(gh issue view  "$PENDING_NUM" --repo "$REPO" --json body  -q '.body'  2>/dev/null || echo "")
+        SLUG=$(echo "$ISSUE_TITLE"           | tr '[:upper:]' '[:lower:]'           | sed 's/\[f\]//gi'           | sed 's/[^a-z0-9]/-/g'           | sed 's/--*/-/g'           | sed 's/^-\|-$//g'           | cut -c1-40)
+        BRANCH="feature/${ISSUE_NUM}-${SLUG}"
+        log "Issue restartée : #$ISSUE_NUM — $ISSUE_TITLE"
+        gh issue edit "$ISSUE_NUM" --repo "$REPO" --add-assignee "@me" 2>/dev/null || true
+        gh issue comment "$ISSUE_NUM" --repo "$REPO"           --body "🤖 Agent Claude Code reprend cette issue (restart). Réimplémentation depuis \`main\`..."
+        tg "*🔄 Restart en cours*
+\`#$ISSUE_NUM\` — $ISSUE_TITLE
+Branche : \`$BRANCH\`"
+        ISSUE_CLAIMED=true
+        state_write "issue_claimed"
+      fi
+    fi
+
+    if [ -z "${ISSUE_NUM:-}" ]; then
     log "Recherche d'une issue [F] non assignée (avec vérification des dépendances)..."
 
     # Récupère jusqu'à 20 issues pour pouvoir trier par dépendances
@@ -256,6 +285,7 @@ process_issue() {
       log "Toutes les issues disponibles sont bloquées par des dépendances non mergées."
       return 3
     fi
+    fi  # fin du if [ -z "${ISSUE_NUM:-}" ]
 
     SLUG=$(echo "$ISSUE_TITLE" \
       | tr '[:upper:]' '[:lower:]' \
@@ -266,14 +296,16 @@ process_issue() {
       | cut -c1-40)
     BRANCH="feature/${ISSUE_NUM}-${SLUG}"
 
-    log "Issue sélectionnée : #$ISSUE_NUM — $ISSUE_TITLE"
-    gh issue edit "$ISSUE_NUM" --repo "$REPO" --add-assignee "@me"
-    gh issue comment "$ISSUE_NUM" --repo "$REPO" \
-      --body "🤖 Agent Claude Code a pris en charge cette issue. Implémentation en cours..."
-    tg "*🤖 Nouvelle issue prise en charge*
+    if [ "${ISSUE_CLAIMED:-false}" != "true" ]; then
+      log "Issue sélectionnée : #$ISSUE_NUM — $ISSUE_TITLE"
+      gh issue edit "$ISSUE_NUM" --repo "$REPO" --add-assignee "@me"
+      gh issue comment "$ISSUE_NUM" --repo "$REPO" \
+        --body "🤖 Agent Claude Code a pris en charge cette issue. Implémentation en cours..."
+      tg "*🤖 Nouvelle issue prise en charge*
 \`#$ISSUE_NUM\` — $ISSUE_TITLE
 Branche : \`$BRANCH\`"
-    state_write "issue_claimed"
+      state_write "issue_claimed"
+    fi
   fi
 
   cd "$REPO_DIR"
