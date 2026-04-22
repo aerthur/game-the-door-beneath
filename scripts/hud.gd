@@ -23,6 +23,13 @@ func _ready():
 	go_panel.visible    = false
 	version_label.text  = "v" + ProjectSettings.get_setting("application/config/version", "0.1.0")
 
+	var sword_lbl = Label.new()
+	sword_lbl.text = "⚔️"
+	sword_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	sword_lbl.add_theme_font_size_override("font_size", 28)
+	weapon_vbox.add_child(sword_lbl)
+	weapon_vbox.move_child(sword_lbl, 0)
+
 # ── HP ───────────────────────────────────────────────────────────
 func update_health(cur: int, mx: int):
 	hp_bar.max_value = mx
@@ -47,9 +54,10 @@ func update_weapons(weapons: Array):
 
 	for w in weapons:
 		var def = get_tree().get_first_node_in_group("game").WEAPON_DEFS[w.id]
+		var icon_str = def.get("icon", "")
 		var lbl = Label.new()
-		lbl.text = "%s  Nv.%d\n  dmg: %d  cd: %.1fs" % [
-			def.name, w.level,
+		lbl.text = "%s %s  Nv.%d\n  dmg: %d  cd: %.1fs" % [
+			icon_str, def.name, w.level,
 			int(def.base_dmg * (1.0 + (w.level - 1) * 0.5)),
 			def.cd
 		]
@@ -93,6 +101,25 @@ func show_level_up(choices: Array):
 			badge.add_theme_color_override("font_color", Color(1.0, 0.75, 0.3))
 		badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		vb.add_child(badge)
+
+		var tex_rect = TextureRect.new()
+		tex_rect.custom_minimum_size = Vector2(48, 48)
+		tex_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		tex_rect.visible = false
+		vb.add_child(tex_rect)
+
+		var icon_lbl = Label.new()
+		var icon_str = def.get("icon", "")
+		var icon_path = def.get("icon_path", "")
+		if icon_path != "":
+			tex_rect.texture = load(icon_path)
+			tex_rect.visible = true
+			icon_lbl.visible = false
+		else:
+			icon_lbl.text = icon_str
+		icon_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		icon_lbl.add_theme_font_size_override("font_size", 48)
+		vb.add_child(icon_lbl)
 
 		var name_lbl = Label.new()
 		name_lbl.text = def.name
