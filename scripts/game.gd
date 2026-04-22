@@ -67,6 +67,7 @@ var tick_interval : float = 1.0
 var blob_scene  = preload("res://scenes/monster_blob.tscn")
 var blue_scene  = preload("res://scenes/monster_blue.tscn")
 var red_scene   = preload("res://scenes/monster_red.tscn")
+var boss_scene  = preload("res://scenes/monster_boss.tscn")
 var gem_scene   = preload("res://scenes/gem.tscn")
 
 # ═════════════════════════════════════════════════════════════════
@@ -135,10 +136,13 @@ func _start_room(num: int):
 	hud.update_room(room_num)
 	hud.hide_door()
 
-	var composition = _get_composition(num)
-	monsters_remaining = composition.size()
-	print("[SALLE %d] Démarrage — %d monstres à tuer — composition: %s" % [num, monsters_remaining, composition])
-	_spawn_wave(composition)
+	if room_num % 5 == 0:
+		_spawn_boss()
+	else:
+		var composition = _get_composition(num)
+		monsters_remaining = composition.size()
+		print("[SALLE %d] Démarrage — %d monstres à tuer — composition: %s" % [num, monsters_remaining, composition])
+		_spawn_wave(composition)
 
 func _get_composition(room: int) -> Array:
 	if ROOM_WAVES.has(room):
@@ -149,6 +153,47 @@ func _get_composition(room: int) -> Array:
 	var result = []
 	for i in reds: result.append("r")
 	return result
+
+func _spawn_boss(escort: Array = []):
+	var boss_type  : String = "g"
+	var boss_hp    : int    = 300
+	var boss_dmg   : int    = 25
+	var boss_speed : int    = 1
+	var boss_xp    : int    = 500
+
+	if room_num >= 15:
+		boss_type  = "r"
+		boss_hp    = 1000
+		boss_dmg   = 60
+		boss_speed = 2
+		boss_xp    = 2000
+		if room_num > 15:
+			var extra_tranches = (room_num - 15) / 5
+			var mult = pow(1.5, extra_tranches)
+			boss_hp  = int(boss_hp  * mult)
+			boss_dmg = int(boss_dmg * mult)
+			boss_xp  = int(boss_xp  * mult)
+	elif room_num >= 10:
+		boss_type  = "b"
+		boss_hp    = 600
+		boss_dmg   = 40
+		boss_speed = 1
+		boss_xp    = 1000
+
+	var boss = boss_scene.instantiate()
+	boss.hp           = boss_hp
+	boss.hp_max       = boss_hp
+	boss.damage       = boss_dmg
+	boss.move_speed   = boss_speed
+	boss.xp_value     = boss_xp
+	boss.monster_type = boss_type
+	monsters_node.add_child(boss)
+	boss.position  = grid_pos(0, 2)
+	boss.grid_row  = 0
+	boss.grid_lane = 2
+	grid[0][2]     = boss
+	monsters_remaining = 1
+	print("[BOSS] Salle %d — type=%s hp=%d dmg=%d" % [room_num, boss_type, boss_hp, boss_dmg])
 
 func _spawn_wave(composition: Array):
 	var lanes_list = range(LANES)
@@ -220,11 +265,22 @@ func _do_tick():
 				var dmg   = m.damage
 				var mtype = m.monster_type
 				grid[r][l] = null
-				m.queue_free()
-				if l == player_lane:
-					_hit_player(dmg)
-				# Dans tous les cas : revient doublé en haut de sa file
-				_on_monster_escaped(l, mtype)
+				if m.is_boss:
+					# Boss: inflige dégâts sur sa file ± 1, remonte soigné sans se dupliquer
+					# TODO: adapter l'axe selon enemy_direction quand ce système sera implémenté
+					var hit_lanes : Dictionary = {}
+					for dl in [-1, 0, 1]:
+						hit_lanes[clamp(l + dl, 0, LANES - 1)] = true
+					for tl in hit_lanes:
+						if tl == player_lane:
+							_hit_player(dmg)
+					_boss_retreat(m, l)
+				else:
+					m.queue_free()
+					if l == player_lane:
+						_hit_player(dmg)
+					# Dans tous les cas : revient doublé en haut de sa file
+					_on_monster_escaped(l, mtype)
 			else:
 				# Si bloqué par un autre monstre, reste sur place
 				if grid[new_row][l] == null:
@@ -259,6 +315,16 @@ func _on_monster_escaped(lane: int, mtype: String):
 
 	spawns_in_flight -= 1
 	_check_room_clear()
+
+func _boss_retreat(boss: Node2D, lane: int):
+	var heal_amount = int(boss.hp_max * 0.3)
+	boss.hp = min(boss.hp_max, boss.hp + heal_amount)
+	boss.update_health_bar()
+	boss.grid_row  = 0
+	boss.grid_lane = lane
+	grid[0][lane]  = boss
+	boss.position  = grid_pos(0, lane)
+	print("[BOSS] Remontée file %d — soigné +%d → %d/%d" % [lane + 1, heal_amount, boss.hp, boss.hp_max])
 
 # ── 8 ARMES ──────────────────────────────────────────────────────
 func _get_dmg(w: Dictionary) -> int:
@@ -715,7 +781,6 @@ func _death_anim_green(pos: Vector2):
 		tw.tween_callback(sq.queue_free)
 
 func _death_anim_blue(pos: Vector2):
-	# Clignotement blanc/bleu 3 fois
 	var flash = ColorRect.new()
 	flash.size = Vector2(32, 32)
 	flash.position = pos - Vector2(16, 16)
@@ -727,8 +792,6 @@ func _death_anim_blue(pos: Vector2):
 		tw.tween_property(flash, "color", Color(0.3, 0.5, 1.0, 0.7), 0.04)
 	tw.tween_property(flash, "modulate", Color(1, 1, 1, 0), 0.05)
 	tw.tween_callback(flash.queue_free)
-
-	# Éclats décalés
 	await get_tree().create_timer(0.10).timeout
 	var shard_count = 6
 	for i in shard_count:
@@ -748,7 +811,6 @@ func _death_anim_blue(pos: Vector2):
 		tw2.tween_callback(shard.queue_free)
 
 func _death_anim_red(pos: Vector2):
-	# Flash rouge intense
 	var flash = ColorRect.new()
 	flash.size = Vector2(42, 42)
 	flash.position = pos - Vector2(21, 21)
@@ -757,8 +819,6 @@ func _death_anim_red(pos: Vector2):
 	var tw = create_tween()
 	tw.tween_property(flash, "modulate", Color(1, 1, 1, 0), 0.2)
 	tw.tween_callback(flash.queue_free)
-
-	# Shockwave circulaire (Line2D en cercle qui s'élargit)
 	var ring = Line2D.new()
 	ring.width = 3.0
 	ring.default_color = Color(1.0, 0.2, 0.2, 0.85)
@@ -774,7 +834,6 @@ func _death_anim_red(pos: Vector2):
 	tw2.tween_callback(ring.queue_free)
 
 func _death_anim_boss(pos: Vector2):
-	# Grand flash doré
 	var flash = ColorRect.new()
 	flash.size = Vector2(70, 70)
 	flash.position = pos - Vector2(35, 35)
@@ -783,8 +842,6 @@ func _death_anim_boss(pos: Vector2):
 	var tw = create_tween()
 	tw.tween_property(flash, "modulate", Color(1, 1, 1, 0), 0.35)
 	tw.tween_callback(flash.queue_free)
-
-	# Gros éclats
 	var shard_count = 10
 	for i in shard_count:
 		var shard = Line2D.new()
@@ -801,8 +858,6 @@ func _death_anim_boss(pos: Vector2):
 		tw2.tween_property(shard, "position", pos + dir * 30.0, 0.5)
 		tw2.parallel().tween_property(shard, "modulate", Color(1, 1, 1, 0), 0.5)
 		tw2.tween_callback(shard.queue_free)
-
-	# Double shockwave décalée
 	for wave_i in 2:
 		var ring = Line2D.new()
 		ring.width = 4.0 - wave_i * 1.5
@@ -818,8 +873,6 @@ func _death_anim_boss(pos: Vector2):
 		ring_tw.tween_property(ring, "scale", Vector2(6.0 + wave_i * 2.0, 6.0 + wave_i * 2.0), 0.55)
 		ring_tw.parallel().tween_property(ring, "modulate", Color(1, 1, 1, 0), 0.55)
 		ring_tw.tween_callback(ring.queue_free)
-
-	# Screen shake
 	var cam = get_viewport().get_camera_2d()
 	if cam:
 		var shake_tw = create_tween()

@@ -7,6 +7,7 @@ var frozen_ticks : int = 0
 var xp_value     : int = 100
 var monster_type : String = "r"
 
+var is_boss   : bool = false
 var grid_row  : int = 0
 var grid_lane : int = 0
 

@@ -25,6 +25,7 @@ roguelite_medieval/
 │   ├── monster_blob.tscn       ← gobelin vert
 │   ├── monster_blue.tscn       ← gobelin bleu
 │   ├── monster_red.tscn        ← gobelin rouge
+│   ├── monster_boss.tscn       ← boss (2× visuel, couronne, barre de vie)
 │   ├── gem.tscn                ← gemme XP (Polygon2D diamond)
 │   └── ui/
 │       └── hud.tscn            ← CanvasLayer UI (HP, XP, armes, level-up)
@@ -33,7 +34,8 @@ roguelite_medieval/
     ├── hud.gd                  ← logique HUD
     ├── monster_blob.gd         ← stats gobelin vert (hp=30, dmg=12, spd=1, xp=25)
     ├── monster_blue.gd         ← stats gobelin bleu (hp=55, dmg=20, spd=1, xp=50)
-    └── monster_red.gd          ← stats gobelin rouge (hp=90, dmg=30, spd=2, xp=100)
+    ├── monster_red.gd          ← stats gobelin rouge (hp=90, dmg=30, spd=2, xp=100)
+    └── monster_boss.gd         ← boss (is_boss=true, hp_max, barre de vie, couronne)
 ```
 
 ## Architecture game.gd (fichier central)
@@ -63,9 +65,11 @@ var grid               : Array # grid[row][lane] = monstre Node2D ou null
 ```
 
 ### Fonctions importantes
-- `_start_room(num)` — démarre une salle, spawne la vague
+- `_start_room(num)` — démarre une salle ; appelle `_spawn_boss()` si room_num % 5 == 0
 - `_do_tick()` — déplace tous les monstres d'une rangée vers le bas
 - `_on_monster_escaped(lane, mtype)` — monstre arrivé en bas → duplique (async)
+- `_boss_retreat(boss, lane)` — boss arrivé en bas → soigne 30% HP max, remonte row 0
+- `_spawn_boss(escort=[])` — spawne le boss en lane 2 row 0 ; escort réservé aux futures escortes
 - `_on_monster_killed(lane, pos, xp)` — kill confirmé, décrémente compteur
 - `_check_room_clear()` — vérifie si grille vide + aucun spawn en vol → clear
 - `_deal_and_check(m, row, lane, dmg)` — applique dégâts, vérifie mort
@@ -104,6 +108,23 @@ Les dégâts scalent avec le niveau : `base_dmg * (1.0 + (level - 1) * 0.5)`
 | Gobelin rouge | "r" | 90 | 30 | 2 | 100 |
 
 `move_speed` = nombre de rangées parcourues par tick.
+
+## Boss (toutes les 5 salles)
+Salle 5, 10, 15, 20… → `_spawn_boss()` remplace `_spawn_wave()`.
+
+| Salle | Type | HP | Dmg | Speed | XP |
+|---|---|---|---|---|---|
+| 5 | vert "g" | 300 | 25 | 1 | 500 |
+| 10 | bleu "b" | 600 | 40 | 1 | 1000 |
+| 15 | rouge "r" | 1000 | 60 | 2 | 2000 |
+| 20+ | rouge "r" | ×1.5/tranche | ×1.5/tranche | 2 | ×1.5/tranche |
+
+- Spawne en lane 2, row 0 (`monsters_remaining = 1`)
+- Script : `scripts/monster_boss.gd` — `is_boss = true`, `hp_max`, `update_health_bar()`
+- Visuel 2× (corps ~104px), barre de vie 360px via ProgressBar créée dans `_ready()`
+- Couronne ♛ (Label doré) créée dans `_ready()`
+- Échappement : inflige dmg sur lanes ±1 (clampé), remonte row 0 soigné +30% HP max, ne se duplique pas
+- Tuer le boss via les armes décrémente `monsters_remaining` normalement → room clear
 
 ## Conventions de code
 - GDScript 2.0 — utiliser `func name() -> Type:` pour les retours typés
