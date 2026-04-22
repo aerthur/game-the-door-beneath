@@ -24,11 +24,13 @@ func _ready():
 	version_label.text  = "v" + ProjectSettings.get_setting("application/config/version", "0.1.0")
 
 	var sword_lbl = Label.new()
-	sword_lbl.text = "⚔️"
+	sword_lbl.name = "WeaponIcon"
+	sword_lbl.text = "⚜️"
 	sword_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	sword_lbl.add_theme_font_size_override("font_size", 28)
+	sword_lbl.add_theme_font_size_override("font_size", 64)
 	weapon_vbox.add_child(sword_lbl)
 	weapon_vbox.move_child(sword_lbl, 0)
+
 
 # ── HP ───────────────────────────────────────────────────────────
 func update_health(cur: int, mx: int):
@@ -50,7 +52,7 @@ func update_xp(cur: int, needed: int, lv: int):
 # ── Armes (panel droit) ──────────────────────────────────────────
 func update_weapons(weapons: Array):
 	for child in weapon_vbox.get_children():
-		if child.name != "Title": child.queue_free()
+		if child.name != "Title" and child.name != "WeaponIcon": child.queue_free()
 
 	for w in weapons:
 		var def = get_tree().get_first_node_in_group("game").WEAPON_DEFS[w.id]
