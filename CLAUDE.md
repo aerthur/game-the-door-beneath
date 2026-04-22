@@ -22,18 +22,14 @@ roguelite_medieval/
 ├── scenes/
 │   ├── game.tscn               ← scène principale (instancie tout)
 │   ├── player.tscn             ← archer joueur (Node2D + polygones)
-│   ├── monster_blob.tscn       ← gobelin vert
-│   ├── monster_blue.tscn       ← gobelin bleu
-│   ├── monster_red.tscn        ← gobelin rouge
+│   ├── monster.tscn            ← scène générique pour tous les types de monstres
 │   ├── gem.tscn                ← gemme XP (Polygon2D diamond)
 │   └── ui/
 │       └── hud.tscn            ← CanvasLayer UI (HP, XP, armes, level-up)
 └── scripts/
     ├── game.gd                 ← contrôleur principal (TOUT passe par là)
     ├── hud.gd                  ← logique HUD
-    ├── monster_blob.gd         ← stats gobelin vert (hp=30, dmg=12, spd=1, xp=25)
-    ├── monster_blue.gd         ← stats gobelin bleu (hp=55, dmg=20, spd=1, xp=50)
-    └── monster_red.gd          ← stats gobelin rouge (hp=90, dmg=30, spd=2, xp=100)
+    └── monster.gd              ← script générique (stats injectées via init())
 ```
 
 ## Architecture game.gd (fichier central)
@@ -126,10 +122,9 @@ Les dégâts scalent avec le niveau : `base_dmg * (1.0 + (level - 1) * 0.5)`
 4. L'arme sera automatiquement proposable au level-up
 
 ### Nouveau type de monstre
-1. Créer `scripts/monster_XXX.gd` (copier monster_blob.gd, changer stats et monster_type)
-2. Créer `scenes/monster_XXX.tscn` (Node2D + script + visuel)
-3. Preload dans game.gd, ajouter le case dans `_spawn_monster()`
-4. Ajouter dans `ROOM_WAVES` si nécessaire
+1. Ajouter une entrée dans `MONSTER_DEFS` dans game.gd (hp, damage, move_speed, xp_value, color)
+2. Ajouter dans `ROOM_WAVES` si nécessaire
+→ Aucun nouveau fichier à créer
 
 ### Nouvelle mécanique de jeu
 - Toute la logique de jeu passe par game.gd

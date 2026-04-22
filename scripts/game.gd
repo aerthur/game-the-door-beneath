@@ -25,6 +25,13 @@ const ROOM_WAVES = {
 	10: ["b","b","r","r","r","r","r"],
 }
 
+# ── Monstres ─────────────────────────────────────────────────────
+const MONSTER_DEFS = {
+	"g": {"hp": 30,  "damage": 12, "move_speed": 1, "xp_value": 25,  "color": Color(0.3, 0.8, 0.3)},
+	"b": {"hp": 55,  "damage": 20, "move_speed": 1, "xp_value": 50,  "color": Color(0.3, 0.5, 1.0)},
+	"r": {"hp": 90,  "damage": 30, "move_speed": 2, "xp_value": 100, "color": Color(1.0, 0.3, 0.3)},
+}
+
 # ── 8 Armes ──────────────────────────────────────────────────────
 const WEAPON_DEFS = {
 	"arc":        {"name": "Arc",        "base_dmg": 25, "cd": 1.0,  "desc": "1 ennemi dans la file active"},
@@ -64,10 +71,8 @@ var tick_interval : float = 1.0
 @onready var hud           : CanvasLayer = $HUD
 @onready var bg            : Node2D      = $Background
 
-var blob_scene  = preload("res://scenes/monster_blob.tscn")
-var blue_scene  = preload("res://scenes/monster_blue.tscn")
-var red_scene   = preload("res://scenes/monster_red.tscn")
-var gem_scene   = preload("res://scenes/gem.tscn")
+var monster_scene = preload("res://scenes/monster.tscn")
+var gem_scene     = preload("res://scenes/gem.tscn")
 
 # ═════════════════════════════════════════════════════════════════
 func _ready():
@@ -167,10 +172,8 @@ func _spawn_monster(row: int, lane: int, type: String) -> bool:
 		r += 1
 	if r >= ROWS: return false
 
-	var scene = blob_scene
-	if   type == "b": scene = blue_scene
-	elif type == "r": scene = red_scene
-	var m = scene.instantiate()
+	var m = monster_scene.instantiate()
+	m.init(MONSTER_DEFS[type], type)
 	monsters_node.add_child(m)
 	m.position   = grid_pos(r, target_lane)
 	m.grid_row   = r
