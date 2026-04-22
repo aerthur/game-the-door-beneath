@@ -46,10 +46,10 @@ func _apply_type_color():
 
 func _create_health_bar():
 	health_bar = ProgressBar.new()
-	health_bar.max_value     = hp_max
-	health_bar.value         = hp
-	health_bar.position      = Vector2(-180, -115)
-	health_bar.size          = Vector2(360, 16)
+	health_bar.max_value       = hp_max
+	health_bar.value           = hp
+	health_bar.position        = Vector2(-55, -120)
+	health_bar.size            = Vector2(110, 5)
 	health_bar.show_percentage = false
 	add_child(health_bar)
 
@@ -64,13 +64,18 @@ func _create_health_bar():
 	health_bar.add_theme_stylebox_override("fill", fill_style)
 
 	var bg_style = StyleBoxFlat.new()
-	bg_style.bg_color = Color(0.15, 0.12, 0.10, 0.85)
+	bg_style.bg_color          = Color(0.12, 0.10, 0.08, 0.90)
+	bg_style.border_width_left   = 2
+	bg_style.border_width_right  = 2
+	bg_style.border_width_top    = 2
+	bg_style.border_width_bottom = 2
+	bg_style.border_color        = Color(0.85, 0.85, 0.85)
 	health_bar.add_theme_stylebox_override("background", bg_style)
 
 func _create_crown():
 	var crown = Label.new()
 	crown.text     = "♛"
-	crown.position = Vector2(-14, -108)
+	crown.position = Vector2(-14, -88)
 	crown.add_theme_color_override("font_color", Color(1.0, 0.85, 0.0))
 	crown.add_theme_font_size_override("font_size", 22)
 	add_child(crown)

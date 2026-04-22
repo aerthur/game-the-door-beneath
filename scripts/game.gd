@@ -638,7 +638,7 @@ func _generate_choices() -> Array:
 	var pool = []
 	for w in active_weapons:
 		pool.append({"type": "upgrade", "weapon_id": w.id, "current_level": w.level})
-	if active_weapons.size() < 3:
+	if active_weapons.size() < 4:
 		var unowned = _get_unowned_weapons()
 		unowned.shuffle()
 		for wid in unowned:
@@ -781,7 +781,6 @@ func _death_anim_green(pos: Vector2):
 		tw.tween_callback(sq.queue_free)
 
 func _death_anim_blue(pos: Vector2):
-	# Clignotement blanc/bleu 3 fois
 	var flash = ColorRect.new()
 	flash.size = Vector2(32, 32)
 	flash.position = pos - Vector2(16, 16)
@@ -793,8 +792,6 @@ func _death_anim_blue(pos: Vector2):
 		tw.tween_property(flash, "color", Color(0.3, 0.5, 1.0, 0.7), 0.04)
 	tw.tween_property(flash, "modulate", Color(1, 1, 1, 0), 0.05)
 	tw.tween_callback(flash.queue_free)
-
-	# Éclats décalés
 	await get_tree().create_timer(0.10).timeout
 	var shard_count = 6
 	for i in shard_count:
@@ -814,7 +811,6 @@ func _death_anim_blue(pos: Vector2):
 		tw2.tween_callback(shard.queue_free)
 
 func _death_anim_red(pos: Vector2):
-	# Flash rouge intense
 	var flash = ColorRect.new()
 	flash.size = Vector2(42, 42)
 	flash.position = pos - Vector2(21, 21)
@@ -823,8 +819,6 @@ func _death_anim_red(pos: Vector2):
 	var tw = create_tween()
 	tw.tween_property(flash, "modulate", Color(1, 1, 1, 0), 0.2)
 	tw.tween_callback(flash.queue_free)
-
-	# Shockwave circulaire (Line2D en cercle qui s'élargit)
 	var ring = Line2D.new()
 	ring.width = 3.0
 	ring.default_color = Color(1.0, 0.2, 0.2, 0.85)
@@ -840,7 +834,6 @@ func _death_anim_red(pos: Vector2):
 	tw2.tween_callback(ring.queue_free)
 
 func _death_anim_boss(pos: Vector2):
-	# Grand flash doré
 	var flash = ColorRect.new()
 	flash.size = Vector2(70, 70)
 	flash.position = pos - Vector2(35, 35)
@@ -849,8 +842,6 @@ func _death_anim_boss(pos: Vector2):
 	var tw = create_tween()
 	tw.tween_property(flash, "modulate", Color(1, 1, 1, 0), 0.35)
 	tw.tween_callback(flash.queue_free)
-
-	# Gros éclats
 	var shard_count = 10
 	for i in shard_count:
 		var shard = Line2D.new()
@@ -867,8 +858,6 @@ func _death_anim_boss(pos: Vector2):
 		tw2.tween_property(shard, "position", pos + dir * 30.0, 0.5)
 		tw2.parallel().tween_property(shard, "modulate", Color(1, 1, 1, 0), 0.5)
 		tw2.tween_callback(shard.queue_free)
-
-	# Double shockwave décalée
 	for wave_i in 2:
 		var ring = Line2D.new()
 		ring.width = 4.0 - wave_i * 1.5
@@ -884,8 +873,6 @@ func _death_anim_boss(pos: Vector2):
 		ring_tw.tween_property(ring, "scale", Vector2(6.0 + wave_i * 2.0, 6.0 + wave_i * 2.0), 0.55)
 		ring_tw.parallel().tween_property(ring, "modulate", Color(1, 1, 1, 0), 0.55)
 		ring_tw.tween_callback(ring.queue_free)
-
-	# Screen shake
 	var cam = get_viewport().get_camera_2d()
 	if cam:
 		var shake_tw = create_tween()
