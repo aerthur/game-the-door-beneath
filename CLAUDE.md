@@ -71,6 +71,8 @@ var grid               : Array # grid[row][lane] = monstre Node2D ou null
 - `_deal_and_check(m, row, lane, dmg)` — applique dégâts, vérifie mort
 - `_fire_weapon(w)` → dispatch vers `_w_arc`, `_w_arbalete`, etc.
 - `apply_level_up_choice(choice)` — appelée par hud.gd quand le joueur choisit
+- `_show_lore_text(rnum)` — affiche la pensée du héros pendant l'animation de porte (async, coroutine)
+- `_play_door_animation()` — anime la porte + lore + XP ; set `room_clear = true` à la fin
 
 ### Grille
 `grid[row][lane]` contient le Node2D du monstre ou `null`.
@@ -81,6 +83,13 @@ var grid               : Array # grid[row][lane] = monstre Node2D ou null
 ### Système de room clear (important — bug précédemment corrigé)
 La salle est terminée quand `_grid_empty() == true AND spawns_in_flight == 0`.
 Ne pas se fier uniquement à `monsters_remaining` qui peut dériver à cause des coroutines async concurrentes.
+
+### Lore inter-salles (issue #26)
+`LORE_TEXTS` (const dans game.gd) mappe numéro de salle → texte de pensée du héros (salles 1–15).
+Pendant `_play_door_animation()`, `_show_lore_text(room_num)` est lancé sans `await` (coroutine concurrente).
+Timing : fade in 0.3s → affiché 2.5s → fade out 0.3s = 3.1s total.
+`room_clear = true` n'est mis à jour qu'après la fin du lore text (suivi par `Time.get_ticks_msec()`).
+Visuel : `RichTextLabel` BBCode `[center][i]...[/i][/center]`, fond `ColorRect` semi-transparent noir.
 
 ## Les 8 armes
 | id | Nom | Dégâts base | CD | Comportement |

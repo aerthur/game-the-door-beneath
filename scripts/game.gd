@@ -10,6 +10,25 @@ const GRID_X   = (1280 - LANES * LANE_W) / 2
 const GRID_Y   = 30
 const PLAYER_Y = GRID_Y + ROWS * ROW_H + 24
 
+# ── Lore inter-salles ────────────────────────────────────────────
+const LORE_TEXTS = {
+	1:  "L'air est humide. Mes bottes résonnent dans le silence. Je descends.",
+	2:  "Ces créatures... elles étaient plus nombreuses que prévu. Je continue quand même.",
+	3:  "Quelque chose remonte des profondeurs. Une odeur. Ancienne.",
+	4:  "Mes mains tremblent légèrement. Je les ignore. La porte m'attend.",
+	5:  "Ce monstre... il gardait cette porte. Pourquoi garder une porte ?",
+	6:  "Plus bas. Toujours plus bas. La lumière du jour n'existe plus ici.",
+	7:  "Je repense aux histoires qu'on racontait sur ce donjon. Je regrette de ne pas avoir écouté.",
+	8:  "Ils se multiplient. Comme si le donjon lui-même voulait me repousser.",
+	9:  "Je ne sais plus depuis combien de temps je descends. Le temps est différent ici.",
+	10: "Ce gardien était plus fort. Beaucoup plus fort. Ce qui suit sera pire.",
+	11: "Mes flèches s'épuisent. Heureusement quelque chose dans ce donjon me réapprovisionne. Je préfère ne pas savoir quoi.",
+	12: "J'ai entendu une voix. Très loin en dessous. Elle semblait... m'attendre.",
+	13: "Le sol vibre légèrement sous mes pieds. Quelque chose de gigantesque se déplace là-dessous.",
+	14: "Je pourrais faire demi-tour. Cette pensée me traverse l'esprit à chaque salle. Je ne le ferai pas.",
+	15: "Ce gardien rouge... ses yeux étaient intelligents. Il savait qui j'étais. Comment est-ce possible ?",
+}
+
 # ── Composition des 10 salles ────────────────────────────────────
 # "g" = vert, "b" = bleu (salle 3+), "r" = rouge (salle 6+)
 const ROOM_WAVES = {
@@ -389,9 +408,8 @@ func _grid_empty() -> bool:
 	return true
 
 func _room_cleared():
-	room_clear = true
 	await _play_door_animation()
-	# Enchaîne directement sur la salle suivante après l'animation
+	# room_clear est mis à true à la fin de _play_door_animation, après le lore
 	_start_room(room_num + 1)
 
 func _get_room_xp_bonus(room: int) -> int:
@@ -434,6 +452,11 @@ func _play_door_animation():
 
 	_play_jackpot_sound()
 
+	var t0 = Time.get_ticks_msec() / 1000.0
+	var has_lore = LORE_TEXTS.has(room_num)
+	if has_lore:
+		_show_lore_text(room_num)
+
 	var tw = create_tween()
 	tw.tween_property(left_panel,  "position:x", float(door_x - door_w / 2), 0.8)
 	tw.parallel().tween_property(right_panel, "position:x", float(cx + door_w / 2), 0.8)
@@ -468,6 +491,59 @@ func _play_door_animation():
 
 	for n in [stone, glow, left_panel, right_panel]:
 		if is_instance_valid(n): n.queue_free()
+
+	if has_lore:
+		var lore_total = 0.3 + 2.5 + 0.3
+		var elapsed = Time.get_ticks_msec() / 1000.0 - t0
+		var remain = lore_total - elapsed
+		if remain > 0.0:
+			await get_tree().create_timer(remain).timeout
+
+	room_clear = true
+
+func _show_lore_text(rnum: int):
+	var text = LORE_TEXTS.get(rnum, "")
+	if text.is_empty():
+		return
+
+	var panel_w = 800
+	var panel_h = 68
+	var panel_x = 640.0 - panel_w / 2.0
+	var panel_y = 498.0
+
+	var panel = ColorRect.new()
+	panel.color    = Color(0.0, 0.0, 0.0, 0.60)
+	panel.size     = Vector2(panel_w, panel_h)
+	panel.position = Vector2(panel_x, panel_y)
+	panel.modulate.a = 0.0
+	bg.add_child(panel)
+
+	var lbl = RichTextLabel.new()
+	lbl.bbcode_enabled = true
+	lbl.fit_content    = true
+	lbl.scroll_active  = false
+	lbl.text           = "[center][i]" + text + "[/i][/center]"
+	lbl.size           = Vector2(panel_w - 24, panel_h)
+	lbl.position       = Vector2(panel_x + 12, panel_y + 10)
+	lbl.add_theme_font_size_override("normal_font_size", 17)
+	lbl.add_theme_color_override("default_color", Color(0.9, 0.88, 0.8))
+	lbl.modulate.a = 0.0
+	bg.add_child(lbl)
+
+	var tw = create_tween()
+	tw.tween_property(panel, "modulate:a", 1.0, 0.3)
+	tw.parallel().tween_property(lbl, "modulate:a", 1.0, 0.3)
+	await tw.finished
+
+	await get_tree().create_timer(2.5).timeout
+
+	var tw2 = create_tween()
+	tw2.tween_property(panel, "modulate:a", 0.0, 0.3)
+	tw2.parallel().tween_property(lbl, "modulate:a", 0.0, 0.3)
+	await tw2.finished
+
+	if is_instance_valid(panel): panel.queue_free()
+	if is_instance_valid(lbl): lbl.queue_free()
 
 func _play_jackpot_sound():
 	var player = AudioStreamPlayer.new()
