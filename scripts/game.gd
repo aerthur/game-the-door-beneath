@@ -42,7 +42,9 @@ var player_lane : int  = 2
 var player_hp   : int  = 100
 var player_max  : int  = 100
 var room_num    : int  = 1
-var score       : int  = 0
+var gold_current      : int  = 0
+var gold_total_earned : int  = 0
+var gold_spent        : int  = 0
 var xp          : int  = 0
 var xp_needed   : int  = 60
 var hero_level  : int  = 1
@@ -425,15 +427,33 @@ func _deal_and_check(m: Node2D, _row: int, _lane: int, dmg: int):
 		var pos = m.position
 		m.queue_free()
 		_play_death_anim(pos, mtype, false)
-		_on_monster_killed(lane, pos, xp_val)
+		_on_monster_killed(lane, pos, xp_val, mtype)
 
-func _on_monster_killed(lane: int, kill_pos: Vector2, xp_val: int):
-	score += 10 * room_num
+func _on_monster_killed(lane: int, kill_pos: Vector2, xp_val: int, mtype: String):
+	var gold_table = {"g": 5, "b": 12, "r": 25}
+	_add_gold(gold_table.get(mtype, 0))
 	monsters_remaining -= 1
 	print("[KILL] File %d — remaining: %d — grid_empty: %s — in_flight: %d" % [lane+1, monsters_remaining, _grid_empty(), spawns_in_flight])
-	hud.update_score(score)
+	_show_gold_float(kill_pos, gold_table.get(mtype, 0))
 	_spawn_gem(lane, kill_pos, xp_val)
 	_check_room_clear()
+
+func _add_gold(amount: int):
+	gold_current      += amount
+	gold_total_earned += amount
+	hud.update_gold(gold_current)
+
+func _show_gold_float(pos: Vector2, amount: int):
+	var lbl = Label.new()
+	lbl.text = "+%d 💰" % amount
+	lbl.position = pos + Vector2(-28, -30)
+	lbl.add_theme_font_size_override("font_size", 18)
+	lbl.add_theme_color_override("font_color", Color(1.0, 0.85, 0.1))
+	bg.add_child(lbl)
+	var tw = create_tween()
+	tw.tween_property(lbl, "position", lbl.position + Vector2(0, -50), 0.7)
+	tw.parallel().tween_property(lbl, "modulate", Color(1, 1, 1, 0), 0.7)
+	tw.tween_callback(lbl.queue_free)
 
 func _check_room_clear():
 	if room_clear or game_over: return
@@ -460,11 +480,11 @@ func _room_cleared():
 	# Enchaîne directement sur la salle suivante après l'animation
 	_start_room(room_num + 1)
 
-func _get_room_xp_bonus(room: int) -> int:
-	var table = {1: 30, 2: 60, 3: 100, 4: 150, 5: 200, 6: 260, 7: 330, 8: 410, 9: 500}
+func _get_room_gold_bonus(room: int) -> int:
+	var table = {1: 20, 2: 40, 3: 70, 4: 110, 5: 150, 6: 200, 7: 260, 8: 330, 9: 410}
 	if table.has(room):
 		return table[room]
-	return 500 + (room - 10) * 80
+	return 410 + (room - 10) * 60
 
 func _play_door_animation():
 	var door_w  = 200
@@ -506,24 +526,24 @@ func _play_door_animation():
 	tw.parallel().tween_property(glow, "color", Color(1.0, 0.85, 0.2, 0.6), 0.4)
 	await tw.finished
 
-	# +XP doré au-dessus du joueur
-	var xp_bonus = _get_room_xp_bonus(room_num)
-	_add_xp(xp_bonus)
+	# +Or au-dessus du joueur
+	var gold_bonus = _get_room_gold_bonus(room_num)
+	_add_gold(gold_bonus)
 	var pcx = GRID_X + player_lane * LANE_W + LANE_W * 0.5
 	var py  = float(PLAYER_Y) - 80.0
-	var xp_lbl = Label.new()
-	xp_lbl.text = "+%d XP" % xp_bonus
-	xp_lbl.custom_minimum_size = Vector2(200, 0)
-	xp_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	xp_lbl.position = Vector2(pcx - 100.0, py)
-	xp_lbl.add_theme_font_size_override("font_size", 52)
-	xp_lbl.add_theme_color_override("font_color", Color(1.0, 0.85, 0.2))
-	bg.add_child(xp_lbl)
+	var gold_lbl = Label.new()
+	gold_lbl.text = "+%d 💰" % gold_bonus
+	gold_lbl.custom_minimum_size = Vector2(200, 0)
+	gold_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	gold_lbl.position = Vector2(pcx - 100.0, py)
+	gold_lbl.add_theme_font_size_override("font_size", 52)
+	gold_lbl.add_theme_color_override("font_color", Color(1.0, 0.85, 0.2))
+	bg.add_child(gold_lbl)
 	var tw2 = create_tween()
-	tw2.tween_property(xp_lbl, "position:y", py - 110.0, 1.1)
-	tw2.parallel().tween_property(xp_lbl, "modulate", Color(1, 1, 1, 0), 1.1)
+	tw2.tween_property(gold_lbl, "position:y", py - 110.0, 1.1)
+	tw2.parallel().tween_property(gold_lbl, "modulate", Color(1, 1, 1, 0), 1.1)
 	await tw2.finished
-	if is_instance_valid(xp_lbl): xp_lbl.queue_free()
+	if is_instance_valid(gold_lbl): gold_lbl.queue_free()
 
 	var tw3 = create_tween()
 	tw3.tween_property(stone,       "modulate", Color(1, 1, 1, 0), 0.4)
@@ -672,7 +692,7 @@ func _hit_player(dmg: int):
 	player_node.modulate = Color.WHITE
 	if player_hp <= 0:
 		game_over = true
-		hud.show_game_over(score, room_num)
+		hud.show_game_over(gold_total_earned, room_num)
 
 # ── Input ────────────────────────────────────────────────────────
 func _input(event: InputEvent):

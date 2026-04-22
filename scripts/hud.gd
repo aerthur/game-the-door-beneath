@@ -4,7 +4,7 @@ extends CanvasLayer
 @onready var hp_bar     : ProgressBar = $TopLeft/VBox/HPBar
 @onready var hp_label   : Label       = $TopLeft/VBox/HPLabel
 @onready var room_label : Label       = $TopRight/VBox/RoomLabel
-@onready var score_label: Label       = $TopRight/VBox/ScoreLabel
+@onready var gold_label : Label       = $TopRight/VBox/ScoreLabel
 @onready var lane_label : Label       = $TopRight/VBox/LaneLabel
 @onready var xp_bar     : ProgressBar = $XPZone/VBox/XPBar
 @onready var xp_label   : Label       = $XPZone/VBox/XPLabel
@@ -39,9 +39,9 @@ func update_health(cur: int, mx: int):
 	hp_label.text    = "❤  %d / %d" % [cur, mx]
 
 # ── Info ─────────────────────────────────────────────────────────
-func update_room(n: int):   room_label.text  = "Salle  %d" % n
-func update_score(n: int):  score_label.text = "Score  %d" % n
-func update_lane(n: int):   lane_label.text  = "File  %d"  % n
+func update_room(n: int):   room_label.text = "Salle  %d" % n
+func update_gold(n: int):   gold_label.text = "💰 Or : %d" % n
+func update_lane(n: int):   lane_label.text = "File  %d"  % n
 
 # ── XP ───────────────────────────────────────────────────────────
 func update_xp(cur: int, needed: int, lv: int):
@@ -165,7 +165,7 @@ func hide_level_up():
 # ── Game Over ────────────────────────────────────────────────────
 func show_game_over(s: int, r: int):
 	go_panel.visible = true
-	$GameOver/Panel/VBox/LScore.text = "Score  :  %d" % s
+	$GameOver/Panel/VBox/LScore.text = "Or gagné  :  %d 💰" % s
 	$GameOver/Panel/VBox/LRoom.text  = "Salle atteinte  :  %d" % r
 
 func _on_restart_pressed():

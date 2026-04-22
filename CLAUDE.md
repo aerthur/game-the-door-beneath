@@ -55,6 +55,9 @@ const GRID_Y = 30                              # offset Y de la grille
 var player_lane        : int   # 0–4, file active du joueur
 var player_hp          : int   # PV joueur (max 100)
 var room_num           : int   # salle actuelle (1–10+)
+var gold_current       : int   # or disponible (affiché dans HUD)
+var gold_total_earned  : int   # or total gagné depuis le début de la run
+var gold_spent         : int   # or dépensé (prêt pour le marchand)
 var monsters_remaining : int   # compteur de kills restants
 var spawns_in_flight   : int   # nb de coroutines _on_monster_escaped en cours
 var room_clear         : bool  # true = salle vidée, attente ESPACE
@@ -70,7 +73,9 @@ var grid               : Array # grid[row][lane] = monstre Node2D ou null
 - `_on_monster_escaped(lane, mtype)` — monstre arrivé en bas → duplique (async)
 - `_boss_retreat(boss, lane)` — boss arrivé en bas → soigne 30% HP max, remonte row 0
 - `_spawn_boss(escort=[])` — spawne le boss en lane 2 row 0 ; escort réservé aux futures escortes
-- `_on_monster_killed(lane, pos, xp)` — kill confirmé, décrémente compteur
+- `_on_monster_killed(lane, pos, xp, mtype)` — kill confirmé, ajoute l'or, décrémente compteur
+- `_add_gold(amount)` — ajoute de l'or et met à jour le HUD
+- `_get_room_gold_bonus(room)` — bonus or de fin de salle selon la salle
 - `_check_room_clear()` — vérifie si grille vide + aucun spawn en vol → clear
 - `_deal_and_check(m, row, lane, dmg)` — applique dégâts, vérifie mort
 - `_fire_weapon(w)` → dispatch vers `_w_arc`, `_w_arbalete`, etc.
