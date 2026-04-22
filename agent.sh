@@ -88,6 +88,8 @@ gh label create "agent-done" --repo "$REPO" --color "0075ca" \
   --description "Traité par agent Claude Code" 2>/dev/null || true
 gh label create "agent-restart" --repo "$REPO" --color "e99695" \
   --description "Refaire depuis main (codebase changé)" 2>/dev/null || true
+gh label create "agent-retry" --repo "$REPO" --color "f9d0c4" \
+  --description "Aucun commit à la 1ère tentative — 2ème essai au prochain cycle" 2>/dev/null || true
 
 # ── Restart : réinitialise une issue pour la refaire depuis zéro ──
 handle_restart_issues() {
@@ -407,15 +409,34 @@ Log : \`/tmp/claude-output-${ISSUE_NUM}.log\`"
   if [ "$LAST_STEP" = "claude_done" ] || [ "$LAST_STEP" = "push_failed" ]; then
     COMMITS_AHEAD=$(git rev-list --count "origin/$MAIN_BRANCH..HEAD" 2>/dev/null || echo "0")
     if [ "$COMMITS_AHEAD" = "0" ]; then
-      log "Aucun commit créé — feature déjà implémentée ou rien à faire"
-      gh label create "agent-skip" --repo "$REPO" --color "e4e669" \
-        --description "Skippée par agent (déjà implémentée)" 2>/dev/null || true
-      gh issue comment "$ISSUE_NUM" --repo "$REPO" \
-        --body "⏭️ L'agent n'a rien commité — la feature semble déjà implémentée. Issue marquée \`agent-skip\` pour éviter une boucle. Vérification manuelle recommandée."
-      gh issue edit "$ISSUE_NUM" --repo "$REPO" --remove-assignee "@me" --add-label "agent-skip"
-      tg "*⏭️ Issue skippée*
+      # Vérifier si c'est déjà la 2ème tentative vide (label agent-retry présent)
+      HAS_RETRY=$(gh issue view "$ISSUE_NUM" --repo "$REPO" --json labels \
+        -q '[.labels[].name] | index("agent-retry") != null' 2>/dev/null || echo "false")
+
+      if [ "$HAS_RETRY" = "true" ]; then
+        log "Aucun commit (2ème tentative) — feature skippée définitivement"
+        gh label create "agent-skip" --repo "$REPO" --color "e4e669" \
+          --description "Skippée par agent (déjà implémentée)" 2>/dev/null || true
+        gh issue comment "$ISSUE_NUM" --repo "$REPO" \
+          --body "⏭️ L'agent n'a rien commité lors de deux tentatives consécutives. Issue marquée \`agent-skip\` — vérification manuelle recommandée."
+        gh issue edit "$ISSUE_NUM" --repo "$REPO" \
+          --remove-assignee "@me" \
+          --remove-label "agent-retry" \
+          --add-label "agent-skip"
+        tg "*⏭️ Issue skippée (2ème tentative vide)*
 \`#$ISSUE_NUM\` — $ISSUE_TITLE
-Claude n'a rien commité (déjà implémenté ?). Label \`agent-skip\` ajouté."
+Label \`agent-skip\` ajouté."
+      else
+        log "Aucun commit (1ère tentative) — retry au prochain cycle"
+        gh issue comment "$ISSUE_NUM" --repo "$REPO" \
+          --body "⚠️ L'agent n'a rien commité (interruption ou feature déjà là ?). Nouvelle tentative au prochain cycle. Si ce n'est pas souhaité, ajoutez \`agent-skip\` manuellement."
+        gh issue edit "$ISSUE_NUM" --repo "$REPO" \
+          --remove-assignee "@me" \
+          --add-label "agent-retry"
+        tg "*⚠️ Issue sans commit — retry prévu*
+\`#$ISSUE_NUM\` — $ISSUE_TITLE
+Prochaine tentative au prochain cycle."
+      fi
       state_clear
       return 0
     fi
