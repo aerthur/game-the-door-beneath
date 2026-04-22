@@ -33,6 +33,8 @@ func update_health(cur: int, mx: int):
 func update_room(n: int):   room_label.text  = "Salle  %d" % n
 func update_score(n: int):  score_label.text = "Score  %d" % n
 func update_lane(n: int):   lane_label.text  = "File  %d"  % n
+func update_position(side: String, index: int):
+	lane_label.text = "%s  %d" % [side, index]
 
 # ── XP ───────────────────────────────────────────────────────────
 func update_xp(cur: int, needed: int, lv: int):

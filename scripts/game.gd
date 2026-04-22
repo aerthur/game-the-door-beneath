@@ -1,5 +1,5 @@
 extends Node
-# Dernière mise à jour : 2026-04-21
+# Dernière mise à jour : 2026-04-22
 
 # ── Grille ───────────────────────────────────────────────────────
 const LANES    = 5
@@ -9,6 +9,8 @@ const ROW_H    = 68
 const GRID_X   = (1280 - LANES * LANE_W) / 2
 const GRID_Y   = 30
 const PLAYER_Y = GRID_Y + ROWS * ROW_H + 24
+
+enum Side { BOTTOM, RIGHT, TOP, LEFT }
 
 # ── Composition des 10 salles ────────────────────────────────────
 # "g" = vert, "b" = bleu (salle 3+), "r" = rouge (salle 6+)
@@ -38,7 +40,9 @@ const WEAPON_DEFS = {
 }
 
 # ── État ─────────────────────────────────────────────────────────
-var player_lane : int  = 2
+var player_side  : int = Side.BOTTOM   # côté actif du périmètre
+var player_index : int = 2             # position sur ce côté (0 = entrée sens horaire)
+var player_lane  : int = 2             # alias = player_index quand side == BOTTOM
 var player_hp   : int  = 100
 var player_max  : int  = 100
 var room_num    : int  = 1
@@ -78,6 +82,7 @@ func _ready():
 	_start_room(1)
 	hud.update_weapons(active_weapons)
 	hud.update_xp(xp, xp_needed, hero_level)
+	hud.update_position(_side_name(), player_index + 1)
 
 # ── Grille ───────────────────────────────────────────────────────
 func _init_grid():
@@ -113,14 +118,75 @@ func _draw_background():
 
 # ── Joueur ───────────────────────────────────────────────────────
 func _place_player():
-	player_node.position = Vector2(GRID_X + player_lane * LANE_W + LANE_W * 0.5, PLAYER_Y)
+	player_node.position = _player_world_pos()
+	player_node.rotation = _player_rotation()
+
+# Retourne la position monde selon le côté et l'index courant.
+# Chaque côté entre par l'index 0 dans le sens horaire.
+#   BOTTOM : index 0=gauche (lane 0) … LANES-1=droite (lane 4)
+#   RIGHT  : index 0=haut   (row  0) … ROWS-1=bas    (row  7)
+#   TOP    : index 0=droite (lane 4) … LANES-1=gauche (lane 0)
+#   LEFT   : index 0=haut   (row  0) … ROWS-1=bas     (row  7)
+func _player_world_pos() -> Vector2:
+	match player_side:
+		Side.BOTTOM:
+			return Vector2(GRID_X + player_index * LANE_W + LANE_W * 0.5,
+			               GRID_Y + ROWS * ROW_H + 24)
+		Side.RIGHT:
+			return Vector2(GRID_X + LANES * LANE_W + 24,
+			               GRID_Y + player_index * ROW_H + ROW_H * 0.5)
+		Side.TOP:
+			return Vector2(GRID_X + (LANES - 1 - player_index) * LANE_W + LANE_W * 0.5,
+			               GRID_Y - 24)
+		Side.LEFT:
+			return Vector2(GRID_X - 24,
+			               GRID_Y + player_index * ROW_H + ROW_H * 0.5)
+	return Vector2.ZERO
+
+func _player_rotation() -> float:
+	match player_side:
+		Side.BOTTOM: return 0.0
+		Side.RIGHT:  return -PI / 2.0
+		Side.TOP:    return PI
+		Side.LEFT:   return  PI / 2.0
+	return 0.0
+
+func _side_name() -> String:
+	match player_side:
+		Side.BOTTOM: return "Bas"
+		Side.RIGHT:  return "Droite"
+		Side.TOP:    return "Haut"
+		Side.LEFT:   return "Gauche"
+	return "?"
 
 func _move_player(dir: int):
-	player_lane = clamp(player_lane + dir, 0, LANES - 1)
+	var max_idx : int = (LANES - 1) if player_side == Side.BOTTOM or player_side == Side.TOP else (ROWS - 1)
+	var new_idx : int = player_index + dir
+
+	if new_idx < 0:
+		# Transition dans le sens anti-horaire (←)
+		match player_side:
+			Side.BOTTOM: player_side = Side.LEFT;   player_index = ROWS  - 1
+			Side.LEFT:   player_side = Side.TOP;    player_index = LANES - 1
+			Side.TOP:    player_side = Side.RIGHT;  player_index = ROWS  - 1
+			Side.RIGHT:  player_side = Side.BOTTOM; player_index = LANES - 1
+	elif new_idx > max_idx:
+		# Transition dans le sens horaire (→)
+		match player_side:
+			Side.BOTTOM: player_side = Side.RIGHT;  player_index = 0
+			Side.RIGHT:  player_side = Side.TOP;    player_index = 0
+			Side.TOP:    player_side = Side.LEFT;   player_index = 0
+			Side.LEFT:   player_side = Side.BOTTOM; player_index = 0
+	else:
+		player_index = new_idx
+
+	if player_side == Side.BOTTOM:
+		player_lane = player_index
+
 	var tw = create_tween()
-	tw.tween_property(player_node, "position",
-		Vector2(GRID_X + player_lane * LANE_W + LANE_W * 0.5, PLAYER_Y), 0.08)
-	hud.update_lane(player_lane + 1)
+	tw.tween_property(player_node, "position", _player_world_pos(), 0.08)
+	tw.parallel().tween_property(player_node, "rotation", _player_rotation(), 0.08)
+	hud.update_position(_side_name(), player_index + 1)
 
 # ── Salle ────────────────────────────────────────────────────────
 func _start_room(num: int):
