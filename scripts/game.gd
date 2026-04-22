@@ -391,7 +391,8 @@ func _grid_empty() -> bool:
 func _room_cleared():
 	room_clear = true
 	await _play_door_animation()
-	hud.show_door()
+	# Enchaîne directement sur la salle suivante après l'animation
+	_start_room(room_num + 1)
 
 func _get_room_xp_bonus(room: int) -> int:
 	var table = {1: 30, 2: 60, 3: 100, 4: 150, 5: 200, 6: 260, 7: 330, 8: 410, 9: 500}
@@ -439,19 +440,22 @@ func _play_door_animation():
 	tw.parallel().tween_property(glow, "color", Color(1.0, 0.85, 0.2, 0.6), 0.4)
 	await tw.finished
 
+	# +XP doré au-dessus du joueur
 	var xp_bonus = _get_room_xp_bonus(room_num)
 	_add_xp(xp_bonus)
-
+	var pcx = GRID_X + player_lane * LANE_W + LANE_W * 0.5
+	var py  = float(PLAYER_Y) - 80.0
 	var xp_lbl = Label.new()
 	xp_lbl.text = "+%d XP" % xp_bonus
-	xp_lbl.position = Vector2(cx - 55, cy - 20)
-	xp_lbl.add_theme_font_size_override("font_size", 40)
+	xp_lbl.custom_minimum_size = Vector2(200, 0)
+	xp_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	xp_lbl.position = Vector2(pcx - 100.0, py)
+	xp_lbl.add_theme_font_size_override("font_size", 52)
 	xp_lbl.add_theme_color_override("font_color", Color(1.0, 0.85, 0.2))
 	bg.add_child(xp_lbl)
-
 	var tw2 = create_tween()
-	tw2.tween_property(xp_lbl, "position:y", float(cy - 90), 0.9)
-	tw2.parallel().tween_property(xp_lbl, "modulate", Color(1, 1, 1, 0), 0.9)
+	tw2.tween_property(xp_lbl, "position:y", py - 110.0, 1.1)
+	tw2.parallel().tween_property(xp_lbl, "modulate", Color(1, 1, 1, 0), 1.1)
 	await tw2.finished
 	if is_instance_valid(xp_lbl): xp_lbl.queue_free()
 
@@ -515,8 +519,10 @@ func _spawn_gem(lane: int, pos: Vector2, xp_val: int):
 	# X verrouillé sur la file d'origine dès le début — on ne tweene que Y
 	var fixed_x = GRID_X + lane * LANE_W + LANE_W * 0.5
 	g.position.x = fixed_x
+	var dist     = abs((PLAYER_Y - 10) - g.position.y)
+	var duration = dist / 380.0  # 380 px/s — vitesse constante
 	var tw = create_tween()
-	tw.tween_property(g, "position:y", PLAYER_Y - 10, 1.2)
+	tw.tween_property(g, "position:y", PLAYER_Y - 10, duration)
 	await tw.finished
 	if not is_instance_valid(g): return
 	g.position.x = fixed_x  # sécurité : re-snap au cas où
@@ -531,15 +537,16 @@ func _spawn_gem(lane: int, pos: Vector2, xp_val: int):
 
 func _collect_gem(g: Node2D):
 	var xp_val = g.xp_value
+	g.visible = false  # cacher immédiatement, avant l'await du flash
 	_add_xp(xp_val)
 	var flash = Label.new()
 	flash.text = "+%d XP" % xp_val
-	flash.position = g.position + Vector2(-22, -20)
+	flash.position = g.position + Vector2(-28, -55)
 	flash.add_theme_color_override("font_color", Color(0.5, 1.0, 0.65))
 	bg.add_child(flash)
 	var tw = create_tween()
-	tw.tween_property(flash, "position", flash.position + Vector2(0, -35), 0.7)
-	tw.parallel().tween_property(flash, "modulate", Color(1,1,1,0), 0.7)
+	tw.tween_property(flash, "position", flash.position + Vector2(0, -55), 0.8)
+	tw.parallel().tween_property(flash, "modulate", Color(1,1,1,0), 0.8)
 	await tw.finished
 	if is_instance_valid(flash): flash.queue_free()
 	if is_instance_valid(g): g.queue_free()
