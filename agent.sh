@@ -97,7 +97,7 @@ handle_restart_issues() {
     --repo "$REPO" \
     --state open \
     --label "agent-restart" \
-    --json number,title \
+    --json number,title,labels \
     --limit 5 2>/dev/null || echo "[]")
 
   [ "$RESTART_LIST" = "[]" ] || [ -z "$RESTART_LIST" ] && return 0
@@ -110,6 +110,19 @@ handle_restart_issues() {
 
     NUM=$(echo "$RESTART_LIST"   | python3 -c "import sys,json; d=json.load(sys.stdin); print(d[$i]['number'])")
     TITLE=$(echo "$RESTART_LIST" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d[$i]['title'])")
+
+    # agent-skip est prioritaire sur agent-restart — on ignore sans toucher à rien
+    HAS_SKIP=$(echo "$RESTART_LIST" | python3 -c "
+import sys,json
+d=json.load(sys.stdin)[$i]
+labels=[l['name'] for l in d.get('labels',[])]
+print('true' if 'agent-skip' in labels else 'false')
+")
+    if [ "$HAS_SKIP" = "true" ]; then
+      log "Issue #$NUM ignorée — agent-skip est prioritaire sur agent-restart."
+      gh issue edit "$NUM" --repo "$REPO" --remove-label "agent-restart" 2>/dev/null || true
+      continue
+    fi
 
     SLUG=$(echo "$TITLE" \
       | tr '[:upper:]' '[:lower:]' \
