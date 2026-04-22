@@ -82,9 +82,92 @@ is_token_error() {
   grep -qiE "rate.limit|quota|529|overloaded|token.*exhaust|credit" "$1" 2>/dev/null
 }
 
-# ── Créer le label agent-done si besoin ───────────────────────────
+# ── Créer les labels si besoin ────────────────────────────────────
 gh label create "agent-done" --repo "$REPO" --color "0075ca" \
   --description "Traité par agent Claude Code" 2>/dev/null || true
+gh label create "agent-restart" --repo "$REPO" --color "e99695" \
+  --description "Refaire depuis main (codebase changé)" 2>/dev/null || true
+
+# ── Restart : réinitialise une issue pour la refaire depuis zéro ──
+handle_restart_issues() {
+  local RESTART_LIST COUNT
+
+  RESTART_LIST=$(gh issue list \
+    --repo "$REPO" \
+    --state open \
+    --label "agent-restart" \
+    --json number,title \
+    --limit 5 2>/dev/null || echo "[]")
+
+  [ "$RESTART_LIST" = "[]" ] || [ -z "$RESTART_LIST" ] && return 0
+
+  COUNT=$(echo "$RESTART_LIST" | python3 -c "import sys,json; print(len(json.load(sys.stdin)))")
+  log "[$COUNT issue(s) marquées agent-restart]"
+
+  for i in $(seq 0 $((COUNT - 1))); do
+    local NUM TITLE SLUG OLD_BRANCH
+
+    NUM=$(echo "$RESTART_LIST"   | python3 -c "import sys,json; d=json.load(sys.stdin); print(d[$i]['number'])")
+    TITLE=$(echo "$RESTART_LIST" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d[$i]['title'])")
+
+    SLUG=$(echo "$TITLE" \
+      | tr '[:upper:]' '[:lower:]' \
+      | sed 's/\[f\]//gi' \
+      | sed 's/[^a-z0-9]/-/g' \
+      | sed 's/--*/-/g' \
+      | sed 's/^-\|-$//g' \
+      | cut -c1-40)
+    OLD_BRANCH="feature/${NUM}-${SLUG}"
+
+    log "Restart #$NUM — $TITLE (branche: $OLD_BRANCH)"
+    cd "$REPO_DIR"
+    git fetch origin 2>/dev/null || true
+
+    # Fermer la PR existante si elle existe
+    local EXISTING_PR
+    EXISTING_PR=$(gh pr list --repo "$REPO" --head "$OLD_BRANCH" --json number -q '.[0].number' 2>/dev/null || echo "")
+    if [ -n "$EXISTING_PR" ]; then
+      log "Fermeture PR #$EXISTING_PR..."
+      gh pr close "$EXISTING_PR" --repo "$REPO" \
+        --comment "🔄 Restart demandé — PR annulée, nouvelle implémentation en cours." 2>/dev/null || true
+    fi
+
+    # Supprimer la branche distante
+    if git ls-remote --exit-code --heads origin "$OLD_BRANCH" > /dev/null 2>&1; then
+      log "Suppression branche distante origin/$OLD_BRANCH..."
+      git push origin --delete "$OLD_BRANCH" 2>/dev/null || true
+    fi
+
+    # Supprimer la branche locale
+    if git show-ref --verify --quiet "refs/heads/$OLD_BRANCH"; then
+      git checkout "$MAIN_BRANCH" 2>/dev/null || true
+      git branch -D "$OLD_BRANCH" 2>/dev/null || true
+    fi
+
+    # Vider le state si c'était cette issue en cours
+    if [ -f "$STATE_FILE" ]; then
+      local SAVED_NUM
+      SAVED_NUM=$(state_read issue_num 2>/dev/null || echo "")
+      [ "$SAVED_NUM" = "$NUM" ] && state_clear
+    fi
+
+    # Réinitialiser l'issue : retirer labels, désassigner
+    gh issue edit "$NUM" --repo "$REPO" \
+      --remove-label "agent-restart" \
+      --remove-label "agent-done" \
+      --remove-label "agent-skip" \
+      --remove-assignee "@me" 2>/dev/null || true
+
+    gh issue comment "$NUM" --repo "$REPO" \
+      --body "🔄 **Restart déclenché** — branche supprimée, l'agent va réimplémenter depuis \`main\` au prochain cycle." 2>/dev/null || true
+
+    tg "*🔄 Restart déclenché*
+\`#$NUM\` — $TITLE
+Branche \`$OLD_BRANCH\` supprimée. Réimplémentation au prochain cycle."
+
+    log "Restart #$NUM préparé."
+  done
+}
 
 # ══════════════════════════════════════════════════════════════════
 # FONCTION : traiter une issue complète (étape par étape)
@@ -367,6 +450,7 @@ ISSUES_DONE=0
 SESSION_START=$(date '+%H:%M')
 
 while [ "$ISSUES_DONE" -lt "$MAX_ISSUES" ]; do
+  handle_restart_issues
   process_issue
   EXIT_CODE=$?
 
@@ -413,3 +497,4 @@ tg "*📊 Rapport de session*
 🕐 $SESSION_START → $(date '+%H:%M')
 ✅ Issues traitées : $ISSUES_DONE/$MAX_ISSUES
 🏁 Maximum par session atteint"
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          
