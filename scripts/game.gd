@@ -1,6 +1,5 @@
 extends Node
-# Dernière mise à jour : 2026-04-21
-
+# Dernière mise à jour : 2026-04-22
 
 # ── État ─────────────────────────────────────────────────────────
 var player_hp   : int  = 100
@@ -19,34 +18,32 @@ var game_over   : bool = false
 var leveling_up : bool = false
 
 var active_weapons : Array = [{"id": "arc", "level": 1, "acc": 0.0}]
-var grid : Array = []
+var grid        : Array = []
 var active_gems : Array = []
 
-var run_stats   : Dictionary = {}
-var records     : Dictionary = {}
-var _run_start_ms : int = 0
-
-var tick_acc : float = 0.0
+var tick_acc      : float = 0.0
 var tick_interval : float = 1.0
 
-@onready var monsters_node : Node2D      = $Monsters
-@onready var player_node   : Node2D      = $Player
-@onready var hud           : CanvasLayer = $HUD
-@onready var bg            : Node2D      = $Background
-@onready var visuals     : Node2D      = $Visuals
+@onready var monsters_node  : Node2D      = $Monsters
+@onready var player_node    : Node2D      = $Player
+@onready var hud            : CanvasLayer = $HUD
+@onready var bg             : Node2D      = $Background
+@onready var visuals        : Node2D      = $Visuals
+@onready var enemies        : Node2D      = $Enemies
+@onready var weapons        : Node2D      = $Weapons
+@onready var player_ctrl    : Node2D      = $PlayerCtrl
+@onready var records_ctrl   : Node2D      = $Records
 
-@onready var enemies : Node2D = $Enemies
-@onready var weapons : Node2D = $Weapons
-@onready var player_ctrl : Node2D = $PlayerCtrl
-var gem_scene   = preload("res://scenes/gem.tscn")
+var gem_scene = preload("res://scenes/gem.tscn")
 
 # ═════════════════════════════════════════════════════════════════
 func _ready():
 	add_to_group("game")
-	_load_records()
+	records_ctrl.hud = hud
+	records_ctrl.load_records()
 	visuals.bg = bg
 	enemies.monsters_node = monsters_node
-	enemies.grid = grid
+	enemies.grid  = grid
 	weapons.grid    = grid
 	weapons.visuals = visuals
 	weapons.deal_fn = _deal_and_check
@@ -91,16 +88,16 @@ func _draw_background():
 	for l in GameData.LANES:
 		var lbl = Label.new()
 		lbl.text = "F%d" % (l + 1)
-		lbl.position = Vector2(GameData.GRID_X + l * GameData.LANE_W + GameData.LANE_W * 0.5 - 10, GameData.GRID_Y + GameData.ROWS * GameData.ROW_H + 4)
+		lbl.position = Vector2(GameData.GRID_X + l * GameData.LANE_W + GameData.LANE_W * 0.5 - 10,
+							   GameData.GRID_Y + GameData.ROWS * GameData.ROW_H + 4)
 		lbl.add_theme_color_override("font_color", Color(0.45, 0.45, 0.45))
 		bg.add_child(lbl)
 
-# ── Joueur ───────────────────────────────────────────────────────
-
+# ── Salle ────────────────────────────────────────────────────────
 func _start_room(num: int):
 	if num == 1:
-		_init_run_stats()
-	room_num   = num
+		records_ctrl.init_run_stats()
+	room_num         = num
 	room_clear       = false
 	spawns_in_flight = 0
 	for child in monsters_node.get_children(): child.queue_free()
@@ -116,13 +113,13 @@ func _start_room(num: int):
 	else:
 		var composition = enemies.get_composition(num)
 		monsters_remaining = composition.size()
-		print("[SALLE %d] Démarrage — %d monstres à tuer — composition: %s" % [num, monsters_remaining, composition])
+		print("[SALLE %d] Démarrage — %d monstres — composition: %s" % [num, monsters_remaining, composition])
 		enemies.spawn_wave(composition)
 
 # ── Boucle ───────────────────────────────────────────────────────
 func _process(delta: float):
 	if game_over or leveling_up: return
-	if room_clear: return   # attente ESPACE, pas de ticks ni tirs
+	if room_clear: return
 
 	tick_acc += delta
 	if tick_acc >= tick_interval:
@@ -151,8 +148,6 @@ func _do_tick():
 				var mtype = m.monster_type
 				grid[r][l] = null
 				if m.is_boss:
-					# Boss: inflige dégâts sur sa file ± 1, remonte soigné sans se dupliquer
-					# TODO: adapter l'axe selon enemy_direction quand ce système sera implémenté
 					var hit_lanes : Dictionary = {}
 					for dl in [-1, 0, 1]:
 						hit_lanes[clamp(l + dl, 0, GameData.LANES - 1)] = true
@@ -164,10 +159,8 @@ func _do_tick():
 					m.queue_free()
 					if l == player_ctrl.player_lane:
 						player_ctrl.hit(dmg)
-					# Dans tous les cas : revient doublé en haut de sa file
 					_on_monster_escaped(l, mtype)
 			else:
-				# Si bloqué par un autre monstre, reste sur place
 				if grid[new_row][l] == null:
 					grid[new_row][l] = m
 					grid[r][l] = null
@@ -179,7 +172,7 @@ func _do_tick():
 func _on_monster_escaped(lane: int, mtype: String):
 	spawns_in_flight += 1
 	var before = monsters_remaining
-	monsters_remaining += 1   # le monstre qui s'est échappé comptera comme un nouveau à tuer
+	monsters_remaining += 1
 
 	var s1 = enemies.spawn_monster(0, lane, mtype)
 	if not s1:
@@ -201,14 +194,12 @@ func _on_monster_escaped(lane: int, mtype: String):
 	spawns_in_flight -= 1
 	_check_room_clear()
 
-# ── 8 ARMES ──────────────────────────────────────────────────────
 # ── Combat ───────────────────────────────────────────────────────
 func _deal_and_check(m: Node2D, _row: int, _lane: int, dmg: int):
 	if not is_instance_valid(m): return
 	var xp_val = m.xp_value
 	m.take_damage(dmg)
 	if m.hp <= 0:
-		# Utiliser la position ACTUELLE du monstre (pas celle capturée au moment du tir)
 		var row   = m.grid_row
 		var lane  = m.grid_lane
 		var mtype = m.monster_type
@@ -222,11 +213,7 @@ func _on_monster_killed(lane: int, kill_pos: Vector2, xp_val: int, mtype: String
 	var gold_table = {"g": 5, "b": 12, "r": 25}
 	_add_gold(gold_table.get(mtype, 0))
 	monsters_remaining -= 1
-	if run_stats.has("kills"):
-		run_stats.kills[mtype] = run_stats.kills.get(mtype, 0) + 1
-		var wid = weapons.active_weapon_id
-		if wid != "":
-			run_stats.weapon_kills[wid] = run_stats.weapon_kills.get(wid, 0) + 1
+	records_ctrl.on_kill(mtype, weapons.active_weapon_id)
 	print("[KILL] File %d — remaining: %d — grid_empty: %s — in_flight: %d" % [lane+1, monsters_remaining, _grid_empty(), spawns_in_flight])
 	visuals.show_gold_float(kill_pos, gold_table.get(mtype, 0))
 	_spawn_gem(lane, kill_pos, xp_val)
@@ -239,10 +226,6 @@ func _add_gold(amount: int):
 
 func _check_room_clear():
 	if room_clear or game_over: return
-	# Vérité terrain : la salle est vidée si la grille est physiquement vide
-	# ET qu'aucune coroutine d'escape n'est encore en train de spawner.
-	# Le compteur monsters_remaining peut dériver à cause des awaits concurrents,
-	# mais _grid_empty() + spawns_in_flight == 0 est toujours fiable.
 	if _grid_empty() and spawns_in_flight == 0:
 		if monsters_remaining != 0:
 			print("[CLEAR] Correction compteur dérivé: remaining %d → 0" % monsters_remaining)
@@ -261,31 +244,29 @@ func _room_cleared():
 	room_clear = true
 	_start_room(room_num + 1)
 
+# ── Gemmes ───────────────────────────────────────────────────────
 func _spawn_gem(lane: int, pos: Vector2, xp_val: int):
 	var g = gem_scene.instantiate()
 	g.lane     = lane
 	g.xp_value = xp_val
 	g.position = pos
-	# Couleur de gemme selon la valeur d'XP
 	var diamond = g.get_node("Diamond")
 	if xp_val >= 100:
-		diamond.color = Color(1.0, 0.35, 0.35)   # rouge
+		diamond.color = Color(1.0, 0.35, 0.35)
 	elif xp_val >= 50:
-		diamond.color = Color(0.35, 0.55, 1.0)   # bleue
-	# sinon cyan par défaut (vert)
+		diamond.color = Color(0.35, 0.55, 1.0)
 	bg.add_child(g)
 	active_gems.append({"node": g, "lane": lane})
 
-	# X verrouillé sur la file d'origine dès le début — on ne tweene que Y
 	var fixed_x = GameData.GRID_X + lane * GameData.LANE_W + GameData.LANE_W * 0.5
 	g.position.x = fixed_x
 	var dist     = abs((GameData.PLAYER_Y - 10) - g.position.y)
-	var duration = dist / 380.0  # 380 px/s — vitesse constante
+	var duration = dist / 380.0
 	var tw = create_tween()
 	tw.tween_property(g, "position:y", GameData.PLAYER_Y - 10, duration)
 	await tw.finished
 	if not is_instance_valid(g): return
-	g.position.x = fixed_x  # sécurité : re-snap au cas où
+	g.position.x = fixed_x
 	if lane == player_ctrl.player_lane:
 		_collect_gem(g)
 	else:
@@ -297,7 +278,7 @@ func _spawn_gem(lane: int, pos: Vector2, xp_val: int):
 
 func _collect_gem(g: Node2D):
 	var xp_val = g.xp_value
-	g.visible = false  # cacher immédiatement, avant l'await du flash
+	g.visible = false
 	_add_xp(xp_val)
 	var flash = Label.new()
 	flash.text = "+%d XP" % xp_val
@@ -325,8 +306,7 @@ func _add_xp(amount: int):
 
 func _trigger_level_up():
 	leveling_up = true
-	var choices = _generate_choices()
-	hud.show_level_up(choices)
+	hud.show_level_up(_generate_choices())
 
 func _generate_choices() -> Array:
 	var pool = []
@@ -356,107 +336,12 @@ func apply_level_up_choice(choice: Dictionary):
 	hud.hide_level_up()
 	leveling_up = false
 
-# ── Joueur blessé ────────────────────────────────────────────────
-
-# ── Input (délégué à player_ctrl) ──────────────────────────────
-func _input(event: InputEvent):
-	player_ctrl.handle_input(event, game_over, leveling_up, room_clear)
-
-# ── Callback game over joueur ───────────────────────────────────
+# ── Game Over ────────────────────────────────────────────────────
 func _on_player_game_over():
 	game_over = true
-	_save_records()
+	records_ctrl.on_game_over(room_num, gold_total_earned, hero_level)
 	hud.show_game_over(gold_total_earned, room_num)
 
-# ── Records ──────────────────────────────────────────────────────
-func _init_run_stats():
-	_run_start_ms = Time.get_ticks_msec()
-	run_stats = {
-		"score":        0,
-		"best_room":    1,
-		"run_time":     0,
-		"kills":        {"g": 0, "b": 0, "r": 0},
-		"weapon_kills": {}
-	}
-	for wid in GameData.WEAPON_DEFS.keys():
-		run_stats.weapon_kills[wid] = 0
-
-func _save_records():
-	run_stats.score     = gold_total_earned
-	run_stats.best_room = room_num
-	run_stats.run_time  = int((Time.get_ticks_msec() - _run_start_ms) / 1000)
-
-	var best_score = records.get("best_score", 0)
-	var best_room  = records.get("best_room",  0)
-	var best_time  = records.get("best_time",  0)
-
-	var total_kills   : Dictionary = records.get("total_kills",   {"g": 0, "b": 0, "r": 0})
-	var weapon_kills  : Dictionary = records.get("weapon_kills",  {})
-
-	if run_stats.score    > best_score: best_score = run_stats.score
-	if run_stats.best_room > best_room: best_room  = run_stats.best_room
-	if run_stats.run_time  > best_time: best_time  = run_stats.run_time
-
-	for t in run_stats.kills:
-		total_kills[t] = total_kills.get(t, 0) + run_stats.kills[t]
-	for wid in run_stats.weapon_kills:
-		weapon_kills[wid] = weapon_kills.get(wid, 0) + run_stats.weapon_kills[wid]
-
-	var fav = ""
-	var fav_count = 0
-	for wid in weapon_kills:
-		if weapon_kills[wid] > fav_count:
-			fav_count = weapon_kills[wid]
-			fav = wid
-
-	records = {
-		"best_score":   best_score,
-		"best_room":    best_room,
-		"best_time":    best_time,
-		"total_kills":  total_kills,
-		"weapon_kills": weapon_kills,
-		"fav_weapon":   fav
-	}
-
-	var cfg = ConfigFile.new()
-	cfg.set_value("records", "best_score",  records.best_score)
-	cfg.set_value("records", "best_room",   records.best_room)
-	cfg.set_value("records", "best_time",   records.best_time)
-	cfg.set_value("records", "fav_weapon",  records.fav_weapon)
-	for t in records.total_kills:
-		cfg.set_value("kills", t, records.total_kills[t])
-	for wid in records.weapon_kills:
-		cfg.set_value("weapon_kills", wid, records.weapon_kills[wid])
-	cfg.save("user://records.cfg")
-	print("[RECORDS] Sauvegarde — score: %d  salle: %d  temps: %ds  arme fav: %s" % [best_score, best_room, best_time, fav])
-
-func _load_records():
-	var cfg = ConfigFile.new()
-	if cfg.load("user://records.cfg") != OK:
-		records = {
-			"best_score":   0,
-			"best_room":    0,
-			"best_time":    0,
-			"total_kills":  {"g": 0, "b": 0, "r": 0},
-			"weapon_kills": {},
-			"fav_weapon":   ""
-		}
-		return
-
-	var total_kills : Dictionary = {"g": 0, "b": 0, "r": 0}
-	for t in total_kills.keys():
-		total_kills[t] = cfg.get_value("kills", t, 0)
-
-	var weapon_kills : Dictionary = {}
-	for wid in GameData.WEAPON_DEFS.keys():
-		weapon_kills[wid] = cfg.get_value("weapon_kills", wid, 0)
-
-	records = {
-		"best_score":   cfg.get_value("records", "best_score",  0),
-		"best_room":    cfg.get_value("records", "best_room",   0),
-		"best_time":    cfg.get_value("records", "best_time",   0),
-		"total_kills":  total_kills,
-		"weapon_kills": weapon_kills,
-		"fav_weapon":   cfg.get_value("records", "fav_weapon",  "")
-	}
-	print("[RECORDS] Chargé — meilleur score: %d  salle: %d" % [records.best_score, records.best_room])
+# ── Input (délégué à player_ctrl) ────────────────────────────────
+func _input(event: InputEvent):
+	player_ctrl.handle_input(event, game_over, leveling_up, room_clear)
