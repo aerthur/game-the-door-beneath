@@ -6,127 +6,106 @@
 script = ExtResource("1")
 
 [node name="Body" type="ColorRect" parent="."]
-offset_left = -18.0
+offset_left = -14.0
 offset_top = -2.0
-offset_right = 18.0
-offset_bottom = 28.0
+offset_right = 14.0
+offset_bottom = 22.0
 color = Color(0.72, 0.10, 0.08, 1)
 
 [node name="Head" type="ColorRect" parent="."]
-offset_left = -24.0
-offset_top = -38.0
-offset_right = 24.0
+offset_left = -18.0
+offset_top = -28.0
+offset_right = 18.0
 offset_bottom = 2.0
 color = Color(0.80, 0.12, 0.08, 1)
 
 [node name="EarLeft" type="ColorRect" parent="."]
-offset_left = -32.0
-offset_top = -44.0
-offset_right = -20.0
-offset_bottom = -22.0
+offset_left = -26.0
+offset_top = -32.0
+offset_right = -16.0
+offset_bottom = -16.0
 color = Color(0.80, 0.12, 0.08, 1)
 
 [node name="EarRight" type="ColorRect" parent="."]
-offset_left = 20.0
-offset_top = -44.0
-offset_right = 32.0
-offset_bottom = -22.0
+offset_left = 16.0
+offset_top = -32.0
+offset_right = 26.0
+offset_bottom = -16.0
 color = Color(0.80, 0.12, 0.08, 1)
 
-[node name="BrowLeft" type="ColorRect" parent="."]
-offset_left = -20.0
-offset_top = -36.0
-offset_right = -6.0
-offset_bottom = -30.0
-color = Color(0.15, 0.05, 0.05, 1)
-
-[node name="BrowRight" type="ColorRect" parent="."]
-offset_left = 6.0
-offset_top = -36.0
-offset_right = 20.0
-offset_bottom = -30.0
-color = Color(0.15, 0.05, 0.05, 1)
-
 [node name="EyeLeft" type="ColorRect" parent="."]
-offset_left = -18.0
-offset_top = -30.0
-offset_right = -6.0
-offset_bottom = -16.0
+offset_left = -13.0
+offset_top = -22.0
+offset_right = -4.0
+offset_bottom = -12.0
 color = Color(1.0, 0.55, 0.05, 1)
 
 [node name="EyeRight" type="ColorRect" parent="."]
-offset_left = 6.0
-offset_top = -30.0
-offset_right = 18.0
-offset_bottom = -16.0
+offset_left = 4.0
+offset_top = -22.0
+offset_right = 13.0
+offset_bottom = -12.0
 color = Color(1.0, 0.55, 0.05, 1)
 
 [node name="PupilLeft" type="ColorRect" parent="."]
-offset_left = -15.0
-offset_top = -28.0
-offset_right = -9.0
-offset_bottom = -18.0
+offset_left = -10.0
+offset_top = -20.0
+offset_right = -6.0
+offset_bottom = -14.0
 color = Color(0.05, 0.0, 0.0, 1)
 
 [node name="PupilRight" type="ColorRect" parent="."]
-offset_left = 9.0
-offset_top = -28.0
-offset_right = 15.0
-offset_bottom = -18.0
+offset_left = 6.0
+offset_top = -20.0
+offset_right = 10.0
+offset_bottom = -14.0
 color = Color(0.05, 0.0, 0.0, 1)
 
 [node name="Nose" type="ColorRect" parent="."]
-offset_left = -5.0
-offset_top = -16.0
-offset_right = 5.0
-offset_bottom = -7.0
+offset_left = -3.0
+offset_top = -12.0
+offset_right = 3.0
+offset_bottom = -6.0
 color = Color(0.60, 0.08, 0.06, 1)
 
-[node name="TuskLeft" type="ColorRect" parent="."]
-offset_left = -14.0
+[node name="ToothLeft" type="ColorRect" parent="."]
+offset_left = -10.0
 offset_top = -4.0
-offset_right = -5.0
-offset_bottom = 8.0
+offset_right = -4.0
+offset_bottom = 4.0
 color = Color(0.92, 0.90, 0.82, 1)
 
-[node name="TuskRight" type="ColorRect" parent="."]
-offset_left = 5.0
+[node name="ToothRight" type="ColorRect" parent="."]
+offset_left = 4.0
 offset_top = -4.0
-offset_right = 14.0
-offset_bottom = 8.0
+offset_right = 10.0
+offset_bottom = 4.0
 color = Color(0.92, 0.90, 0.82, 1)
 
 [node name="ArmLeft" type="ColorRect" parent="."]
-offset_left = -36.0
+offset_left = -26.0
 offset_top = 2.0
-offset_right = -18.0
-offset_bottom = 20.0
+offset_right = -14.0
+offset_bottom = 16.0
 color = Color(0.72, 0.10, 0.08, 1)
 
 [node name="ArmRight" type="ColorRect" parent="."]
-offset_left = 18.0
+offset_left = 14.0
 offset_top = 2.0
-offset_right = 36.0
-offset_bottom = 20.0
+offset_right = 26.0
+offset_bottom = 16.0
 color = Color(0.72, 0.10, 0.08, 1)
 
-[node name="Axe" type="ColorRect" parent="."]
-offset_left = 30.0
-offset_top = -20.0
-offset_right = 40.0
-offset_bottom = 24.0
-color = Color(0.40, 0.38, 0.38, 1)
-
-[node name="AxeHead" type="ColorRect" parent="."]
+[node name="Club" type="ColorRect" parent="."]
 offset_left = 22.0
-offset_top = -30.0
-offset_right = 48.0
-offset_bottom = -8.0
-color = Color(0.60, 0.58, 0.58, 1)
+offset_top = -14.0
+offset_right = 32.0
+offset_bottom = 18.0
+color = Color(0.40, 0.25, 0.10, 1)
 
-[node name="AxeHandle" type="ColorRect" parent="."]
-offset_left = 32.0
-offset_top = -38.0
-offset_right = 37.0
-offset_bottom = -30.0
-color = Color(0.38, 0.22, 0.08, 1)
+[node name="ClubHead" type="ColorRect" parent="."]
+offset_left = 16.0
+offset_top = -22.0
+offset_right = 36.0
+offset_bottom = -10.0
+color = Color(0.48, 0.30, 0.12, 1)

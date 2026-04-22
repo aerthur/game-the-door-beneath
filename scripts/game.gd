@@ -89,7 +89,7 @@ func _init_grid():
 
 func grid_pos(row: int, lane: int) -> Vector2:
 	return Vector2(GRID_X + lane * LANE_W + LANE_W * 0.5,
-	               GRID_Y + row  * ROW_H  + ROW_H  * 0.5)
+				   GRID_Y + row  * ROW_H  + ROW_H  * 0.5)
 
 # ── Fond ─────────────────────────────────────────────────────────
 func _draw_background():
@@ -412,9 +412,8 @@ func _spawn_gem(lane: int, pos: Vector2, xp_val: int):
 	var tw = create_tween()
 	tw.tween_property(g, "position:y", PLAYER_Y - 10, 1.2)
 	await tw.finished
-	g.position.x = fixed_x  # sécurité : re-snap au cas où
-
 	if not is_instance_valid(g): return
+	g.position.x = fixed_x  # sécurité : re-snap au cas où
 	if lane == player_lane:
 		_collect_gem(g)
 	else:
@@ -509,7 +508,7 @@ func _input(event: InputEvent):
 
 # ── Visuels d'attaque ────────────────────────────────────────────
 func _shoot_arrow(lane: int, target_row: int, duration: float,
-                  col: Color = Color(0.95, 0.85, 0.3), w: float = 3.0):
+				  col: Color = Color(0.95, 0.85, 0.3), w: float = 3.0):
 	var arrow = Node2D.new()
 	var shaft = Line2D.new()
 	shaft.add_point(Vector2(0, 0)); shaft.add_point(Vector2(0, -28))
