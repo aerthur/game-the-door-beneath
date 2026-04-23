@@ -9,10 +9,8 @@ extends Node2D
 var monsters_node : Node2D
 var grid          : Array   # référence partagée avec game.gd
 
-var blob_scene = preload("res://scenes/monster_blob.tscn")
-var blue_scene = preload("res://scenes/monster_blue.tscn")
-var red_scene  = preload("res://scenes/monster_red.tscn")
-var boss_scene = preload("res://scenes/monster_boss.tscn")
+var monster_scene = preload("res://scenes/monster.tscn")
+var boss_scene    = preload("res://scenes/monster_boss.tscn")
 
 # ── Helper position grille ───────────────────────────────────────
 func grid_pos(row: int, lane: int) -> Vector2:
@@ -92,10 +90,13 @@ func spawn_monster(row: int, lane: int, type: String) -> bool:
 		r += 1
 	if r >= GameData.ROWS: return false
 
-	var scene = blob_scene
-	if   type == "b": scene = blue_scene
-	elif type == "r": scene = red_scene
-	var m = scene.instantiate()
+	var def = GameData.MONSTER_DEFS[type]
+	var m = monster_scene.instantiate()
+	m.monster_type = type
+	m.hp           = def.hp
+	m.damage       = def.damage
+	m.move_speed   = def.move_speed
+	m.xp_value     = def.xp_value
 	monsters_node.add_child(m)
 	m.position          = grid_pos(r, target_lane)
 	m.grid_row          = r

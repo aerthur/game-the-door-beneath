@@ -42,6 +42,13 @@ const LORE_TEXTS = {
 	15: "Ce gardien rouge... ses yeux étaient intelligents. Il savait qui j'étais. Comment est-ce possible ?",
 }
 
+# ── Définitions des monstres ─────────────────────────────────────
+const MONSTER_DEFS = {
+	"g": {"hp": 30,  "damage": 12, "move_speed": 1, "xp_value": 25,  "color": Color(0.3, 0.8, 0.3)},
+	"b": {"hp": 55,  "damage": 20, "move_speed": 1, "xp_value": 50,  "color": Color(0.3, 0.5, 1.0)},
+	"r": {"hp": 90,  "damage": 30, "move_speed": 2, "xp_value": 100, "color": Color(1.0, 0.3, 0.3)},
+}
+
 # ── Définitions des armes ────────────────────────────────────────
 const WEAPON_DEFS = {
 	"arc":        {"name": "Arc",        "base_dmg": 25, "cd": 1.0,  "desc": "1 ennemi dans la file active",       "icon": "🏹", "icon_path": ""},
