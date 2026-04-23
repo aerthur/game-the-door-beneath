@@ -17,10 +17,11 @@ Jeu roguelite en lanes développé avec **Godot 4.6** et **GDScript 2.0**.
 ## Structure des fichiers
 ```
 roguelite_medieval/
-├── project.godot
+├── project.godot               ← scène principale : title_screen.tscn
 ├── CLAUDE.md                   ← ce fichier
 ├── scenes/
-│   ├── game.tscn               ← scène principale (instancie tout)
+│   ├── title_screen.tscn       ← écran de titre (scène principale au démarrage)
+│   ├── main.tscn               ← scène de jeu (lancée depuis title_screen)
 │   ├── player.tscn             ← archer joueur (Node2D + polygones)
 │   ├── monster_blob.tscn       ← gobelin vert
 │   ├── monster_blue.tscn       ← gobelin bleu
@@ -28,9 +29,16 @@ roguelite_medieval/
 │   ├── monster_boss.tscn       ← boss (2× visuel, couronne, barre de vie)
 │   ├── gem.tscn                ← gemme XP (Polygon2D diamond)
 │   └── ui/
-│       └── hud.tscn            ← CanvasLayer UI (HP, XP, armes, level-up)
+│       └── hud.tscn            ← CanvasLayer UI (HP, XP, armes, level-up, game over)
 └── scripts/
+    ├── title_screen.gd         ← logique écran de titre + panel meilleurs scores
     ├── game.gd                 ← contrôleur principal (TOUT passe par là)
+    ├── game_constants.gd       ← class_name GameData : constantes, WEAPON_DEFS, ROOM_WAVES
+    ├── game_records.gd         ← persistance records (user://records.json)
+    ├── game_enemies.gd         ← spawn, mouvement, logique monstres
+    ├── game_weapons.gd         ← logique des 8 armes
+    ├── game_player.gd          ← inputs, déplacements, PV joueur
+    ├── game_visuals.gd         ← effets visuels (flèches, explosions, éclairs)
     ├── hud.gd                  ← logique HUD
     ├── monster_blob.gd         ← stats gobelin vert (hp=30, dmg=12, spd=1, xp=25)
     ├── monster_blue.gd         ← stats gobelin bleu (hp=55, dmg=20, spd=1, xp=50)
@@ -93,9 +101,19 @@ var grid               : Array # grid[row][lane] = monstre Node2D ou null
 La salle est terminée quand `_grid_empty() == true AND spawns_in_flight == 0`.
 Ne pas se fier uniquement à `monsters_remaining` qui peut dériver à cause des coroutines async concurrentes.
 
+### Écran de titre (issue #28)
+Scène principale au démarrage : `scenes/title_screen.tscn` / `scripts/title_screen.gd`.
+- Fond noir avec grille de pierre générée procéduralement dans `_draw_stone_grid()`
+- Menu : "⚔ Nouvelle partie" → `get_tree().change_scene_to_file("res://scenes/main.tscn")`
+- Menu : "📜 Meilleurs scores" → affiche `ScoresPanel` par-dessus (pas de nouvelle scène)
+- `ScoresPanel` lit `user://records.json` via `_load_records()` (même format que `game_records.gd`)
+- Référence `GameData.WEAPON_DEFS` (class_name) pour l'arme préférée
+- Meilleur score affiché en bas du menu (discret, mis à jour au chargement)
+- Bouton "Menu principal" sur l'écran Game Over (hud.gd `_on_menu_principal_pressed()`)
+
 ### Système de records (issue #27)
 Stats de la run courante dans `run_stats` (score, salle, temps, kills par type, kills par arme).
-Records persistants dans `records`, sauvegardés dans `user://records.cfg` via `ConfigFile`.
+Records persistants dans `records`, sauvegardés dans `user://records.json` via `JSON`.
 - `_init_run_stats()` — appelée dans `_start_room(1)`, réinitialise `run_stats` et démarre le chrono
 - `_save_records()` — compare run courante aux records, met à jour et sauvegarde ; appelée dans `_on_player_game_over()`
 - `_load_records()` — chargée dans `_ready()`

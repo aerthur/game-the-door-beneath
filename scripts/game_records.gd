@@ -72,6 +72,26 @@ func on_game_over(room: int, gold_earned: int, hero_level: int):
 	if run_secs > records.best_time:
 		records["best_time"] = run_secs
 	records["total_runs"] = records.get("total_runs", 0) + 1
+
+	# Kills cumulatifs par type
+	for mtype in ["g", "b", "r"]:
+		var key = "total_kills_" + mtype
+		records[key] = records.get(key, 0) + run_stats.kills.get(mtype, 0)
+
+	# Kills cumulatifs par arme → arme préférée
+	for wid in run_stats.weapon_kills:
+		var key = "weapon_kills_" + wid
+		records[key] = records.get(key, 0) + run_stats.weapon_kills[wid]
+	var best_wid = ""
+	var best_count = 0
+	for wid in GameData.WEAPON_DEFS.keys():
+		var count = int(records.get("weapon_kills_" + wid, 0))
+		if count > best_count:
+			best_count = count
+			best_wid = wid
+	if best_wid != "":
+		records["fav_weapon"] = best_wid
+
 	save_records()
 
 	print("[RECORDS] Salle:%d Or:%d Lvl:%d — best_room:%d best_gold:%d" % [
