@@ -16,44 +16,47 @@ Jeu roguelite en lanes développé avec **Godot 4.6** et **GDScript 2.0**.
 
 ## Structure des fichiers
 ```
-roguelite_medieval/
 ├── project.godot
 ├── CLAUDE.md                   ← ce fichier
 ├── scenes/
-│   ├── game.tscn               ← scène principale (instancie tout)
+│   ├── main.tscn               ← scène principale (instancie tout)
 │   ├── player.tscn             ← archer joueur (Node2D + polygones)
 │   ├── monster.tscn            ← gobelin générique (couleur injectée via monster_type)
 │   ├── monster_boss.tscn       ← boss (2× visuel, couronne, barre de vie)
-│   ├── gem.tscn                ← gemme XP (Polygon2D diamond)
+│   ├── gem.tscn                ← gemme XP (ColorRect diamond)
 │   └── ui/
 │       └── hud.tscn            ← CanvasLayer UI (HP, XP, armes, level-up)
 └── scripts/
-    ├── game.gd                 ← contrôleur principal (TOUT passe par là)
+    ├── game.gd                 ← contrôleur principal (état, tick, gems, XP)
+    ├── game_constants.gd       ← class GameData : LANES/ROWS, MONSTER_DEFS, WEAPON_DEFS, LORE_TEXTS, ROOM_WAVES
+    ├── game_enemies.gd         ← spawn monstres/boss, composition des vagues, retraite boss
+    ├── game_weapons.gd         ← logique de tir des 8 armes
+    ├── game_player.gd          ← déplacement joueur, HP, game over
+    ├── game_visuals.gd         ← animations (porte, mort, flottants or/XP)
     ├── hud.gd                  ← logique HUD
-    ├── monster.gd              ← script générique ; stats injectées depuis MONSTER_DEFS
+    ├── monster.gd              ← script générique ; stats injectées depuis GameData.MONSTER_DEFS
     └── monster_boss.gd         ← boss (is_boss=true, hp_max, barre de vie, couronne)
 ```
 
-## Architecture game.gd (fichier central)
+## Architecture (fichiers principaux)
 
-### Constantes importantes
+### Constantes (game_constants.gd — class GameData)
 ```gdscript
 const LANES  = 5      # files horizontales
 const ROWS   = 8      # rangées verticales
 const LANE_W = 180    # largeur d'une file en pixels
 const ROW_H  = 68     # hauteur d'une rangée en pixels
-const GRID_X = (1280 - LANES * LANE_W) / 2   # offset X de la grille
-const GRID_Y = 30                              # offset Y de la grille
+const GRID_X = (1280 - LANES * LANE_W) / 2
+const GRID_Y = 30
+const PLAYER_Y = GRID_Y + ROWS * ROW_H + 24
 ```
+Accès partout via `GameData.LANES`, `GameData.MONSTER_DEFS`, etc.
 
-### Variables d'état clés
+### Variables d'état clés (game.gd)
 ```gdscript
-var player_lane        : int   # 0–4, file active du joueur
-var player_hp          : int   # PV joueur (max 100)
 var room_num           : int   # salle actuelle (1–10+)
 var gold_current       : int   # or disponible (affiché dans HUD)
 var gold_total_earned  : int   # or total gagné depuis le début de la run
-var gold_spent         : int   # or dépensé (prêt pour le marchand)
 var monsters_remaining : int   # compteur de kills restants
 var spawns_in_flight   : int   # nb de coroutines _on_monster_escaped en cours
 var room_clear         : bool  # true = salle vidée, attente ESPACE
@@ -63,21 +66,16 @@ var active_weapons     : Array # [{"id": "arc", "level": 1, "acc": 0.0}, ...]
 var grid               : Array # grid[row][lane] = monstre Node2D ou null
 ```
 
-### Fonctions importantes
-- `_start_room(num)` — démarre une salle ; appelle `_spawn_boss()` si room_num % 5 == 0
-- `_do_tick()` — déplace tous les monstres d'une rangée vers le bas
-- `_on_monster_escaped(lane, mtype)` — monstre arrivé en bas → duplique (async)
-- `_boss_retreat(boss, lane)` — boss arrivé en bas → soigne 30% HP max, remonte row 0
-- `_spawn_boss(escort=[])` — spawne le boss en lane 2 row 0 ; escort réservé aux futures escortes
-- `_on_monster_killed(lane, pos, xp, mtype)` — kill confirmé, ajoute l'or, décrémente compteur
-- `_add_gold(amount)` — ajoute de l'or et met à jour le HUD
-- `_get_room_gold_bonus(room)` — bonus or de fin de salle selon la salle
-- `_check_room_clear()` — vérifie si grille vide + aucun spawn en vol → clear
-- `_deal_and_check(m, row, lane, dmg)` — applique dégâts, vérifie mort
-- `_fire_weapon(w)` → dispatch vers `_w_arc`, `_w_arbalete`, etc.
-- `apply_level_up_choice(choice)` — appelée par hud.gd quand le joueur choisit
-- `_show_lore_text(rnum)` — affiche la pensée du héros pendant l'animation de porte (async, coroutine)
-- `_play_door_animation()` — anime la porte + lore + XP ; set `room_clear = true` à la fin
+### Fonctions clés par fichier
+**game.gd** : `_start_room(num)`, `_do_tick()`, `_on_monster_escaped(lane, mtype)`, `_on_monster_killed(lane, pos, xp, mtype)`, `_deal_and_check(m, row, lane, dmg)`, `_add_gold(amount)`, `_check_room_clear()`, `apply_level_up_choice(choice)`
+
+**game_enemies.gd** : `spawn_monster(row, lane, type)`, `spawn_wave(composition)`, `spawn_boss(room_num)`, `boss_retreat(boss, lane)`, `get_composition(room)`
+
+**game_weapons.gd** : `fire(w)` → dispatch vers `_w_arc`, `_w_arbalete`, etc.
+
+**game_player.gd** : `handle_input(event, ...)`, `hit(dmg)`, `init_player(lane, hp, hp_max)`
+
+**game_visuals.gd** : `play_door_animation(room_num, ...)`, `play_death_anim(pos, mtype, is_boss)`, `show_gold_float(pos, amount)`
 
 ### Grille
 `grid[row][lane]` contient le Node2D du monstre ou `null`.
@@ -90,7 +88,7 @@ La salle est terminée quand `_grid_empty() == true AND spawns_in_flight == 0`.
 Ne pas se fier uniquement à `monsters_remaining` qui peut dériver à cause des coroutines async concurrentes.
 
 ### Lore inter-salles (issue #26)
-`LORE_TEXTS` (const dans game.gd) mappe numéro de salle → texte de pensée du héros (salles 1–15).
+`LORE_TEXTS` (const dans `game_constants.gd` → `GameData.LORE_TEXTS`) mappe numéro de salle → texte de pensée du héros (salles 1–15).
 Pendant `_play_door_animation()`, `_show_lore_text(room_num)` est lancé sans `await` (coroutine concurrente).
 Timing : fade in 0.3s → affiché 2.5s → fade out 0.3s = 3.1s total.
 `room_clear = true` n'est mis à jour qu'après la fin du lore text (suivi par `Time.get_ticks_msec()`).
@@ -151,9 +149,9 @@ Salle 5, 10, 15, 20… → `_spawn_boss()` remplace `_spawn_wave()`.
 ## Comment ajouter une feature typique
 
 ### Nouvelle arme
-1. Ajouter dans `WEAPON_DEFS` dans game.gd
-2. Ajouter un `case` dans `_fire_weapon()`
-3. Implémenter `_w_nomArme(w: Dictionary)`
+1. Ajouter dans `WEAPON_DEFS` dans `game_constants.gd`
+2. Ajouter un `case` dans `game_weapons.gd → fire()`
+3. Implémenter `_w_nomArme(w: Dictionary)` dans `game_weapons.gd`
 4. L'arme sera automatiquement proposable au level-up
 
 ### Nouveau type de monstre
@@ -172,5 +170,5 @@ Tous les gobelins utilisent `monster.tscn`. Référence des offsets :
 - ArmRight : offset_left=14, offset_top=2, offset_right=26, offset_bottom=16
 
 ### Nouvelle mécanique de jeu
-- Toute la logique de jeu passe par game.gd
+- La logique est répartie entre game.gd (orchestrateur), game_enemies.gd, game_weapons.gd, game_player.gd, game_visuals.gd
 - Le HUD communique avec game.gd via `get_tree().get_first_node_in_group("game")`
