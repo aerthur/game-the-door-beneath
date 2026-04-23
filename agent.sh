@@ -239,7 +239,7 @@ Branche : \`$BRANCH\`"
     ALL_ISSUES=$(gh issue list \
       --repo "$REPO" \
       --state open \
-      --search "[F] in:title no:assignee -label:blocked -label:agent-skip" \
+      --search "[F] in:title no:assignee -label:blocked -label:agent-skip -label:agent-done" \
       --limit 20 \
       --json number,title,body \
       2>/dev/null || echo "[]")
