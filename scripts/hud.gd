@@ -222,4 +222,4 @@ func show_game_over(s: int, r: int):
 	$GameOver/Panel/VBox/LRoom.text  = "Salle atteinte  :  %d" % r
 
 func _on_restart_pressed():
-	get_tree().reload_current_
+	get_tree().reload_current_scene()
