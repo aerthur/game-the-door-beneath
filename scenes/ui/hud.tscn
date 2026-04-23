@@ -80,7 +80,7 @@ offset_bottom = 560.0
 layout_mode = 2
 
 [node name="Title" type="Label" parent="ShopPanel/VBox"]
-text = "— MARCHAND —"
+text = "🧙 — MARCHAND —"
 horizontal_alignment = 1
 
 [node name="WeaponPanel" type="PanelContainer" parent="."]
