@@ -31,6 +31,14 @@ func _ready():
 	weapon_vbox.add_child(sword_lbl)
 	weapon_vbox.move_child(sword_lbl, 0)
 
+	# Connexion programmatique des boutons Game Over (fiable indépendamment du .tscn)
+	var btn_restart = $GameOver/Panel/VBox/Restart
+	var btn_menu    = $GameOver/Panel/VBox/MenuPrincipal
+	if not btn_restart.pressed.is_connected(_on_restart_pressed):
+		btn_restart.pressed.connect(_on_restart_pressed)
+	if not btn_menu.pressed.is_connected(_on_menu_principal_pressed):
+		btn_menu.pressed.connect(_on_menu_principal_pressed)
+
 
 # ── HP ───────────────────────────────────────────────────────────
 func update_health(cur: int, mx: int):
@@ -169,7 +177,9 @@ func show_game_over(s: int, r: int):
 	$GameOver/Panel/VBox/LRoom.text  = "Salle atteinte  :  %d" % r
 
 func _on_restart_pressed():
-	get_tree().reload_current_scene()
+	print("[HUD] Restart pressed")
+	get_tree().call_deferred("change_scene_to_file", "res://scenes/main.tscn")
 
 func _on_menu_principal_pressed():
-	get_tree().change_scene_to_file("res://scenes/title_screen.tscn")
+	print("[HUD] Menu principal pressed")
+	get_tree().call_deferred("change_scene_to_file", "res://scenes/title_screen.tscn")

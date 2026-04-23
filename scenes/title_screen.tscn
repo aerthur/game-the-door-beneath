@@ -6,7 +6,7 @@
 script = ExtResource("1")
 
 [node name="Background" type="ColorRect" parent="."]
-color = Color(0.04, 0.03, 0.06)
+color = Color(0.04, 0.03, 0.06, 1)
 size = Vector2(1280, 720)
 
 [node name="StoneGrid" type="Node2D" parent="."]

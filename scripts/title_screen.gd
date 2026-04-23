@@ -1,6 +1,7 @@
 extends Node
 # ── TitleScreen ───────────────────────────────────────────────────
 
+const DEBUG     = true   # ← mettre false pour désactiver les prints de debug
 const SAVE_PATH = "user://records.json"
 
 var records : Dictionary = {}
@@ -13,11 +14,23 @@ var records : Dictionary = {}
 @onready var btn_scores       : Button  = $UI/TitlePanel/BtnScores
 @onready var content_label    : Label   = $UI/ScoresPanel/Panel/VBox/Content
 
+func _dbg(msg: String):
+	if not DEBUG: return
+	print("[TitleScreen] " + msg)
+	push_warning("[TitleScreen] " + msg)  # visible dans Debugger→Errors même après fermeture
+
 func _ready():
+	_dbg("_ready() debut")
+	_dbg("nodes: best_score_label=%s title_label=%s btn_new_game=%s" % [
+		str(best_score_label), str(title_label), str(btn_new_game)])
 	_load_records()
+	_dbg("load_records OK — records=%s" % str(records))
 	_draw_stone_grid()
+	_dbg("draw_stone_grid OK")
 	_style_ui()
+	_dbg("style_ui OK")
 	_update_best_score()
+	_dbg("ready TERMINE")
 
 func _load_records():
 	if not FileAccess.file_exists(SAVE_PATH):
@@ -46,16 +59,23 @@ func _draw_stone_grid():
 			stone_node.add_child(rect)
 
 func _style_ui():
+	_dbg("_style_ui: title_label")
 	title_label.add_theme_font_size_override("font_size", 58)
 	title_label.add_theme_color_override("font_color", Color(0.85, 0.72, 0.38))
+	_dbg("_style_ui: sub_label")
 	sub_label.add_theme_font_size_override("font_size", 16)
 	sub_label.add_theme_color_override("font_color", Color(0.55, 0.50, 0.60))
+	_dbg("_style_ui: buttons")
 	btn_new_game.add_theme_font_size_override("font_size", 22)
 	btn_scores.add_theme_font_size_override("font_size", 20)
+	_dbg("_style_ui: best_score_label")
 	best_score_label.add_theme_font_size_override("font_size", 14)
 	best_score_label.add_theme_color_override("font_color", Color(0.55, 0.50, 0.60))
+	_dbg("_style_ui: ScoresPanel/Title")
 	$UI/ScoresPanel/Panel/VBox/Title.add_theme_font_size_override("font_size", 20)
+	_dbg("_style_ui: content_label")
 	content_label.add_theme_font_size_override("font_size", 17)
+	_dbg("_style_ui: terminé ✓")
 
 func _update_best_score():
 	if records.has("best_gold"):
