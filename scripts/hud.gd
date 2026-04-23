@@ -9,6 +9,7 @@ extends CanvasLayer
 @onready var xp_bar     : ProgressBar = $XPZone/VBox/XPBar
 @onready var xp_label   : Label       = $XPZone/VBox/XPLabel
 @onready var weapon_vbox: VBoxContainer = $WeaponPanel/VBox
+@onready var shop_vbox  : VBoxContainer = $ShopPanel/VBox
 @onready var door_hint  : Label       = $DoorHint
 @onready var lvlup_panel: Control     = $LevelUp
 @onready var lvlup_hbox : HBoxContainer = $LevelUp/Panel/VBox/Cards
@@ -16,6 +17,7 @@ extends CanvasLayer
 @onready var version_label : Label   = $VersionLabel
 
 var _current_choices : Array = []
+var _shop_buttons    : Array = []
 
 func _ready():
 	door_hint.visible   = false
@@ -30,6 +32,14 @@ func _ready():
 	sword_lbl.add_theme_font_size_override("font_size", 64)
 	weapon_vbox.add_child(sword_lbl)
 	weapon_vbox.move_child(sword_lbl, 0)
+
+	var shop_icon = Label.new()
+	shop_icon.name = "ShopIcon"
+	shop_icon.text = "🧙"
+	shop_icon.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	shop_icon.add_theme_font_size_override("font_size", 64)
+	shop_vbox.add_child(shop_icon)
+	shop_vbox.move_child(shop_icon, 0)
 
 
 # ── HP ───────────────────────────────────────────────────────────
@@ -161,6 +171,49 @@ func _on_choice_selected(index: int):
 
 func hide_level_up():
 	lvlup_panel.visible = false
+
+# ── Marchand ─────────────────────────────────────────────────────
+func update_shop(potions: Array, purchase_count: int, gold: int):
+	_shop_buttons.clear()
+	for child in shop_vbox.get_children():
+		if child.name != "Title" and child.name != "ShopIcon":
+			child.queue_free()
+
+	for id in potions:
+		var def  = GameData.POTION_DEFS[id]
+		var cost = def.prix_base + purchase_count * 15
+
+		var sep = ColorRect.new()
+		sep.custom_minimum_size = Vector2(0, 1)
+		sep.color = Color(0.3, 0.3, 0.3)
+		shop_vbox.add_child(sep)
+
+		var slot = PanelContainer.new()
+		var vb   = VBoxContainer.new()
+		slot.add_child(vb)
+
+		var info_lbl = Label.new()
+		info_lbl.text = "%s %s\n%s" % [def.icon, def.name, def.desc]
+		info_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD
+		info_lbl.add_theme_color_override("font_color", Color(0.85, 0.78, 0.55))
+		vb.add_child(info_lbl)
+
+		var btn = Button.new()
+		btn.text     = "Acheter — %d 💰" % cost
+		btn.disabled = gold < cost
+		btn.pressed.connect(_on_potion_buy_pressed.bind(id))
+		vb.add_child(btn)
+
+		shop_vbox.add_child(slot)
+		_shop_buttons.append({"button": btn, "cost": cost})
+
+func refresh_shop_buttons(gold: int):
+	for entry in _shop_buttons:
+		entry.button.disabled = gold < entry.cost
+
+func _on_potion_buy_pressed(id: String):
+	var game = get_tree().get_first_node_in_group("game")
+	game.apply_potion(id)
 
 # ── Game Over ────────────────────────────────────────────────────
 func show_game_over(s: int, r: int):

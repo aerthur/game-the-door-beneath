@@ -54,6 +54,11 @@ func hit(dmg: int):
 	if player_hp <= 0:
 		emit_signal("game_over_triggered")
 
+# ── Soin ─────────────────────────────────────────────────────────
+func heal(amount: int):
+	player_hp = min(player_max, player_hp + amount)
+	hud.update_health(player_hp, player_max)
+
 # ── Input ────────────────────────────────────────────────────────
 func handle_input(event: InputEvent, game_over: bool, leveling_up: bool, room_clear: bool):
 	if game_over or leveling_up: return

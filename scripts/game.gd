@@ -21,6 +21,9 @@ var active_weapons : Array = [{"id": "arc", "level": 1, "acc": 0.0}]
 var grid        : Array = []
 var active_gems : Array = []
 
+var shop_purchase_count  : int   = 0
+var current_shop_potions : Array = []
+
 var tick_acc      : float = 0.0
 var tick_interval : float = 1.0
 
@@ -97,6 +100,7 @@ func _draw_background():
 func _start_room(num: int):
 	if num == 1:
 		records_ctrl.init_run_stats()
+		shop_purchase_count = 0
 	room_num         = num
 	room_clear       = false
 	spawns_in_flight = 0
@@ -115,6 +119,7 @@ func _start_room(num: int):
 		monsters_remaining = composition.size()
 		print("[SALLE %d] Démarrage — %d monstres — composition: %s" % [num, monsters_remaining, composition])
 		enemies.spawn_wave(composition)
+	_generate_shop()
 
 # ── Boucle ───────────────────────────────────────────────────────
 func _process(delta: float):
@@ -223,6 +228,7 @@ func _add_gold(amount: int):
 	gold_current      += amount
 	gold_total_earned += amount
 	hud.update_gold(gold_current)
+	hud.refresh_shop_buttons(gold_current)
 
 func _check_room_clear():
 	if room_clear or game_over: return
@@ -335,6 +341,38 @@ func apply_level_up_choice(choice: Dictionary):
 	hud.update_weapons(active_weapons)
 	hud.hide_level_up()
 	leveling_up = false
+
+# ── Marchand ─────────────────────────────────────────────────────
+func _generate_shop():
+	var all_ids  = GameData.POTION_DEFS.keys()
+	var heal_ids = all_ids.filter(func(id): return GameData.POTION_DEFS[id].type == "heal")
+	heal_ids.shuffle()
+	var selected : Array = [heal_ids[0]]
+	var remaining = all_ids.filter(func(id): return id != heal_ids[0])
+	remaining.shuffle()
+	for id in remaining:
+		if selected.size() >= 3: break
+		selected.append(id)
+	selected.shuffle()
+	current_shop_potions = selected
+	hud.update_shop(current_shop_potions, shop_purchase_count, gold_current)
+
+func apply_potion(id: String):
+	var def  = GameData.POTION_DEFS[id]
+	var cost = def.prix_base + shop_purchase_count * 15
+	if gold_current < cost: return
+	gold_current -= cost
+	gold_spent   += cost
+	shop_purchase_count += 1
+	hud.update_gold(gold_current)
+	match def.type:
+		"heal":
+			player_ctrl.heal(def.value)
+		"xp":
+			_add_xp(def.value)
+		"gold":
+			_add_gold(def.value)
+	hud.update_shop(current_shop_potions, shop_purchase_count, gold_current)
 
 # ── Game Over ────────────────────────────────────────────────────
 func _on_player_game_over():

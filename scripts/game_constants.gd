@@ -53,3 +53,12 @@ const WEAPON_DEFS = {
 	"givre":      {"name": "Givre",      "base_dmg": 8,  "cd": 1.5,  "desc": "Ralentit l'ennemi 2 ticks",          "icon": "❄️", "icon_path": ""},
 	"sismique":   {"name": "Sismique",   "base_dmg": 9,  "cd": 3.0,  "desc": "2 dernières rangées, toutes files",  "icon": "🪨", "icon_path": ""},
 }
+
+# ── Définitions des potions (marchand) ───────────────────────────
+const POTION_DEFS = {
+	"heal_s":       {"name": "Petite Potion",  "icon": "💊", "desc": "+25 HP",       "prix_base": 15, "type": "heal", "value": 25},
+	"heal_l":       {"name": "Grande Potion",  "icon": "🧪", "desc": "+60 HP",       "prix_base": 35, "type": "heal", "value": 60},
+	"elixir":       {"name": "Élixir Sacré",   "icon": "⚗️",  "desc": "Soins complets","prix_base": 70, "type": "heal", "value": 9999},
+	"parchemin_xp": {"name": "Parchemin XP",   "icon": "📜", "desc": "+100 XP",      "prix_base": 25, "type": "xp",   "value": 100},
+	"potion_or":    {"name": "Potion d'Or",    "icon": "💛", "desc": "+50 or",       "prix_base": 20, "type": "gold", "value": 50},
+}

@@ -102,6 +102,16 @@ Records persistants dans `records`, sauvegardés dans `user://records.cfg` via `
 - `weapons.active_weapon_id` (game_weapons.gd) — mis à jour dans `fire()` pour tracker l'arme qui tue
 - L'arme préférée globale (`fav_weapon`) est celle avec le plus de kills cumulés toutes runs.
 
+### Marchand en jeu (issue #31)
+`POTION_DEFS` (const dans game_constants.gd) — 5 potions disponibles : heal_s, heal_l, elixir, parchemin_xp, potion_or.
+`ShopPanel` (PanelContainer) dans hud.tscn — à gauche, symétrique du WeaponPanel.
+- `shop_purchase_count : int` dans game.gd — incrémenté à chaque achat, remis à 0 en salle 1.
+- Prix affiché = `prix_base + shop_purchase_count * 15`
+- `_generate_shop()` dans game.gd — appelée dans `_start_room()` ; garantit ≥1 potion de soin parmi les 3 tirées.
+- `apply_potion(id)` dans game.gd — vérifie l'or, applique l'effet (heal/xp/gold), met à jour le HUD.
+- `update_shop(potions, purchase_count, gold)` dans hud.gd — reconstruit les 3 slots.
+- `refresh_shop_buttons(gold)` dans hud.gd — active/désactive les boutons selon l'or disponible.
+
 ### Lore inter-salles (issue #26)
 `LORE_TEXTS` (const dans game.gd) mappe numéro de salle → texte de pensée du héros (salles 1–15).
 Pendant `_play_door_animation()`, `_show_lore_text(room_num)` est lancé sans `await` (coroutine concurrente).

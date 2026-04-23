@@ -69,6 +69,20 @@ max_value = 80.0
 value = 0.0
 show_percentage = false
 
+[node name="ShopPanel" type="PanelContainer" parent="."]
+anchors_preset = 0
+offset_left = 4.0
+offset_top = 100.0
+offset_right = 190.0
+offset_bottom = 560.0
+
+[node name="VBox" type="VBoxContainer" parent="ShopPanel"]
+layout_mode = 2
+
+[node name="Title" type="Label" parent="ShopPanel/VBox"]
+text = "— MARCHAND —"
+horizontal_alignment = 1
+
 [node name="WeaponPanel" type="PanelContainer" parent="."]
 anchors_preset = 3
 anchor_left = 1.0
