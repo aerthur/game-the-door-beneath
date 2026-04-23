@@ -525,6 +525,18 @@ Tester dans Godot 4.6 puis merger."
 # ══════════════════════════════════════════════════════════════════
 # BOUCLE PRINCIPALE
 # ══════════════════════════════════════════════════════════════════
+PAUSE_FILE="$REPO_DIR/.agent_paused"
+
+# ── Pause manuelle ────────────────────────────────────────────────
+if [ -f "$PAUSE_FILE" ]; then
+  PAUSE_MSG=$(cat "$PAUSE_FILE" 2>/dev/null || echo "")
+  log "Agent en pause — $(date '+%Y-%m-%d %H:%M'). ${PAUSE_MSG:+Raison : $PAUSE_MSG}"
+  tg "*⏸ Agent en pause*
+${PAUSE_MSG:-Pause manuelle active.}
+Supprimez \`.agent_paused\` pour reprendre."
+  exit 0
+fi
+
 log "=== Démarrage agent — max $MAX_ISSUES issues ==="
 tg "*🚀 Agent démarré*
 Recherche d'issues \`[F]\` à traiter..."
