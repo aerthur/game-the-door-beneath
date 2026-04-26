@@ -7,7 +7,7 @@ Jeu roguelite en lanes développé avec **Godot 4.6** et **GDScript 2.0**.
 - Language : GDScript 2.0
 
 Archer en bas, 5 files verticales, monstres qui descendent tick par tick.
-Scène principale : `main.tscn` (anciennement `game.tscn`).
+Scène de démarrage : `title_screen.tscn` → lance `main.tscn` au clic "Nouvelle partie".
 
 ---
 
@@ -18,20 +18,18 @@ game-the-door-beneath/
 ├── project.godot
 ├── CLAUDE.md
 ├── scenes/
-│   ├── main.tscn               ← scène mode Lanes (instancie tout)
-│   ├── dungeon.tscn            ← scène mode Donjon
-│   ├── player.tscn             ← archer mode Lanes (Node2D)
+│   ├── title_screen.tscn       ← scène principale au démarrage (menu + meilleurs scores)
+│   ├── main.tscn               ← scène de jeu (lancée depuis title_screen)
+│   ├── player.tscn             ← archer joueur (Node2D + polygones)
 │   ├── monster_blob.tscn       ← gobelin vert
 │   ├── monster_blue.tscn       ← gobelin bleu
 │   ├── monster_red.tscn        ← gobelin rouge
 │   ├── monster_boss.tscn       ← boss (2× visuel, couronne, barre de vie)
 │   ├── gem.tscn                ← gemme XP (Polygon2D diamond)
-│   ├── enemy_slime.tscn        ← slime mode Donjon
-│   ├── item_potion.tscn        ← potion (soigne 30 HP)
-│   ├── item_stairs.tscn        ← escaliers (signal next_floor_reached)
 │   └── ui/
-│       └── hud.tscn            ← CanvasLayer UI (HP, XP, armes, level-up)
+│       └── hud.tscn            ← CanvasLayer UI (HP, XP, armes, level-up, game over)
 └── scripts/
+    ├── title_screen.gd         ← menu principal + affichage meilleurs scores
     ├── game.gd                 ← coordinateur principal (état, tick, room)
     ├── game_constants.gd       ← class_name GameData (constantes, ROOM_WAVES, WEAPON_DEFS, LORE_TEXTS)
     ├── game_enemies.gd         ← spawn, placement, retraite des ennemis ($Enemies)
