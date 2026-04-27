@@ -173,7 +173,7 @@ func _on_monster_escaped(lane: int, mtype: String):
 	var before = monsters_remaining
 	monsters_remaining += 1
 
-	var s1 = enemies.spawn_monster(0, lane, mtype)
+	var s1 = enemies.spawn_monster(mtype, { "entry_side": "top", "entry_index": lane })
 	if not s1:
 		monsters_remaining -= 1
 		print("[ESCAPE] File %d type=%s — spawn1 RATÉ — remaining: %d→%d" % [lane+1, mtype, before, monsters_remaining])
@@ -183,7 +183,7 @@ func _on_monster_escaped(lane: int, mtype: String):
 	await get_tree().create_timer(0.35).timeout
 
 	if not game_over:
-		var s2 = enemies.spawn_monster(0, lane, mtype)
+		var s2 = enemies.spawn_monster(mtype, { "entry_side": "top", "entry_index": lane })
 		if not s2:
 			monsters_remaining -= 1
 			print("[ESCAPE] File %d type=%s — spawn2 RATÉ — remaining: %d" % [lane+1, mtype, monsters_remaining])
