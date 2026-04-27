@@ -1,5 +1,9 @@
 class_name GameData
 
+# Simulation fixe — 1 seconde de gameplay = 12 ticks logiques
+const TICKS_PER_SECOND : int = 12
+# Conversions de référence : 6 ticks = 0,5 s ; 12 ticks = 1 s ; 24 ticks = 2 s
+
 # ── Composition des salles ───────────────────────────────────────
 const ROOM_WAVES = {
 	1:  ["g","g","g"],
@@ -152,6 +156,6 @@ const WEAPON_DEFS = {
 	"bombe":      {"name": "Bombe",      "base_dmg": 20, "cd": 2.5,  "desc": "Explose sur 3 files voisines",       "icon": "💣", "icon_path": ""},
 	"eclair":     {"name": "Eclair",     "base_dmg": 16, "cd": 1.5,  "desc": "Frappe tous les ennemis de la file", "icon": "⚡", "icon_path": ""},
 	"tourbillon": {"name": "Tourbillon", "base_dmg": 12, "cd": 2.0,  "desc": "1ère rangée de chaque file",         "icon": "🌀", "icon_path": ""},
-	"givre":      {"name": "Givre",      "base_dmg": 8,  "cd": 1.5,  "desc": "Ralentit l'ennemi 4 ticks",          "icon": "❄️", "icon_path": ""},
+	"givre":      {"name": "Givre",      "base_dmg": 8,  "cd": 1.5,  "desc": "Ralentit l'ennemi 2s + dégâts",      "icon": "❄️", "icon_path": ""},
 	"sismique":   {"name": "Sismique",   "base_dmg": 9,  "cd": 3.0,  "desc": "2 dernières rangées, toutes files",  "icon": "🪨", "icon_path": ""},
 }

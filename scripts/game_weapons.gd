@@ -91,7 +91,7 @@ func _w_givre(w: Dictionary):
 			visuals.shoot_arrow(player_lane, r, 0.2, Color(0.4, 0.85, 1.0), 3.0)
 			await get_tree().create_timer(0.2).timeout
 			if is_instance_valid(m):
-				m.freeze(4)  # 4 demi-ticks = 2s effectifs (doublé pour compenser tick_interval=0.5)
+				m.freeze(24)  # 24 ticks = 2 s à 12 tps
 				deal_fn.call(m, r, player_lane, get_dmg(w))
 			return
 

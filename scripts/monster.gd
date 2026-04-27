@@ -1,19 +1,21 @@
 extends Node2D
 class_name Monster
 
-var hp           : int = 0
-var hp_max       : int = 0
-var damage       : int = 0
-var move_speed   : int = 1
-var frozen_ticks : int = 0
-var xp_value     : int = 0
-var monster_type : String = ""
-var is_boss      : bool = false
-var grid_row     : int = 0
-var grid_lane    : int = 0
-var behavior     : String = "standard"
-var palette      : Dictionary = {}
-var tags         : Array = []
+var hp                   : int = 0
+var hp_max               : int = 0
+var damage               : int = 0
+var move_speed           : int = 1
+var move_period_ticks    : int = 12  # ticks entre chaque déplacement (12 = 1 case/s à 12 tps)
+var move_countdown_ticks : int = 12  # décompte avant le prochain déplacement
+var frozen_ticks         : int = 0   # ticks de gel restants (12 ticks = 1 s)
+var xp_value             : int = 0
+var monster_type         : String = ""
+var is_boss              : bool = false
+var grid_row             : int = 0
+var grid_lane            : int = 0
+var behavior             : String = "standard"
+var palette              : Dictionary = {}
+var tags                 : Array = []
 
 func take_damage(amount: int) -> void:
 	hp -= amount
@@ -44,6 +46,10 @@ func setup_from_def(monster_id: String, def: Dictionary) -> void:
 	is_boss      = def.get("is_boss", false)
 	behavior     = def.get("behavior", "standard")
 	tags         = def.get("tags", []).duplicate()
+	# Conversion move_speed → période en ticks (12 tps)
+	# move_speed 1 → 12 ticks/move (1 case/s) ; move_speed 2 → 6 ticks/move (2 cases/s)
+	move_period_ticks    = max(1, GameData.TICKS_PER_SECOND / max(1, move_speed))
+	move_countdown_ticks = move_period_ticks
 	if def.has("palette"):
 		palette = def["palette"].duplicate()
 		apply_palette(palette)
