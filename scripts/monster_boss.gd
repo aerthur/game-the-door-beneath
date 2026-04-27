@@ -23,11 +23,7 @@ func _create_health_bar():
 	health_bar.show_percentage = false
 	add_child(health_bar)
 
-	var bar_col : Color
-	match monster_type:
-		"g": bar_col = Color(0.25, 0.65, 0.14)
-		"b": bar_col = Color(0.25, 0.45, 0.90)
-		_:   bar_col = Color(0.85, 0.20, 0.15)
+	var bar_col : Color = palette.get("main", Color(0.85, 0.20, 0.15))
 
 	var fill_style = StyleBoxFlat.new()
 	fill_style.bg_color = bar_col

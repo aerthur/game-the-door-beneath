@@ -247,6 +247,56 @@ Tous les gobelins partagent la même géométrie (monster_blob.tscn). Seule la c
 
 ---
 
+## Architecture des archétypes et variantes (issue #54)
+
+### Champs normalisés de MONSTER_DEFS
+
+Chaque entrée de `GameData.MONSTER_DEFS` doit contenir :
+
+| Champ | Type | Rôle |
+|---|---|---|
+| `name` | String | Nom affiché |
+| `scene` | String (res://) | Scène instanciée par `game_enemies.gd` |
+| `behavior` | String | Identifiant comportement ("standard", "boss", …) |
+| `hp` | int | Points de vie |
+| `damage` | int | Dégâts infligés |
+| `move_speed` | int | Rangées par tick |
+| `xp_value` | int | XP accordée au kill |
+| `is_boss` | bool | Boss = true (spawner contextuel + retraite) |
+| `tags` | Array[String] | Flags optionnels (ex: ["boss", "armored"]) |
+| `palette` | Dictionary | Couleurs `main/dark/nose/eye` (appliquées par `monster.gd`) |
+| `monster_type` | String (optionnel) | Type de base pour records (boss uniquement ; ex: boss_g → "g") |
+
+Le spawn est **entièrement data-driven** : `game_enemies._get_scene(def["scene"])` charge et cache la scène automatiquement — aucun preload à ajouter dans `game_enemies.gd`.
+
+### Point d'extension comportement
+
+`Monster.on_tick()` est appelé à chaque tick de mouvement. Les comportements spéciaux surchargent cette méthode dans leur script GDScript.
+
+```gdscript
+# Dans scripts/monster_charge.gd (exemple futur)
+extends Monster
+func on_tick() -> void:
+    move_speed += 1  # accélère chaque tick
+```
+
+`game.gd` devra appeler `m.on_tick()` dans `_do_tick()` pour activer le dispatch. Actuellement le hook existe mais n'est pas encore appelé — à brancher lors de l'implémentation du premier comportement spécial.
+
+### Spawn contextuel (pensé pour le futur mode "en face du joueur")
+
+`game_enemies.spawn_monster(monster_id, spawn_ctx)` accepte un contexte :
+
+```gdscript
+spawn_ctx = {
+    "entry_side":  "top" | "bottom" | "left" | "right",
+    "entry_index": int  # numéro de lane (top/bottom) ou rangée (left/right)
+}
+```
+
+Ce système est conçu pour supporter un futur mode où les ennemis spawneraient en face du joueur ou depuis plusieurs bords simultanément, sans modifier l'API publique de spawn.
+
+---
+
 ## Comment ajouter une feature typique
 
 ### Nouvelle arme (Mode Lanes)
@@ -255,11 +305,30 @@ Tous les gobelins partagent la même géométrie (monster_blob.tscn). Seule la c
 3. Implémenter `_w_nomArme(w: Dictionary)` dans `game_weapons.gd`
 4. L'arme sera automatiquement proposable au level-up
 
-### Nouveau type de monstre (Mode Lanes)
-1. Créer `scripts/monster_XXX.gd` (copier monster_blob.gd, changer stats et monster_type)
-2. Créer `scenes/monster_XXX.tscn` (Node2D + script + visuel)
-3. Preload dans `game_enemies.gd`, ajouter le case dans `_spawn_monster()`
-4. Ajouter dans `GameData.ROOM_WAVES` si nécessaire
+### Ennemi standard (nouvelle couleur / stats)
+1. Ajouter une entrée dans `GameData.MONSTER_DEFS` (`game_constants.gd`) avec les champs normalisés
+2. Pointer `"scene"` vers `"res://scenes/monster_base.tscn"` (scène réutilisable)
+3. Définir la `"palette"` (main/dark/nose/eye) pour la couleur
+4. Ajouter la clé dans `GameData.ROOM_WAVES` pour les salles concernées
+5. Aucune modification de code dans `game_enemies.gd`
+
+### Nouvelle variante visuelle (nouvelle scène)
+1. Créer `scenes/monster_XXX.tscn` avec un script héritant `Monster` (ou `monster_boss.gd`)
+2. Le script n'a besoin de surcharger que ce qui diffère (ex: `_ready` pour ajouter des nœuds visuels)
+3. Pointer `"scene": "res://scenes/monster_XXX.tscn"` dans `MONSTER_DEFS`
+4. `game_enemies._get_scene()` chargera et cachera la scène automatiquement
+
+### Nouveau boss
+1. Ajouter une entrée `"boss_XXX"` dans `MONSTER_DEFS` avec `"is_boss": true`, `"tags": ["boss"]`, `"scene": "res://scenes/monster_boss.tscn"` et `"monster_type": "X"` (type de base pour records)
+2. Ajouter le cas dans `game_enemies.spawn_boss()` si la salle de déclenchement diffère du pattern ×5 existant
+3. La barre de vie et la couronne sont créées automatiquement par `monster_boss.gd` via la palette
+
+### Comportement spécial futur
+1. Créer `scripts/monster_behavior_XXX.gd` (extends Monster)
+2. Surcharger `on_tick()` avec la logique spéciale
+3. Créer une scène `scenes/monster_XXX.tscn` utilisant ce script
+4. Brancher `m.on_tick()` dans `game.gd._do_tick()` si ce n'est pas encore fait
+5. Pointer `"behavior": "XXX"` dans `MONSTER_DEFS` (informatif, le dispatch est par héritage)
 
 ### Nouvelle mécanique de jeu
 - Logique de tick/état → `game.gd`
