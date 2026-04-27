@@ -28,8 +28,8 @@ func init_player(lane: int, hp: int, hp_max: int):
 	player_hp   = hp
 	player_max  = hp_max
 	player_node.position = Vector2(
-		GameData.GRID_X + player_lane * GameData.LANE_W + GameData.LANE_W * 0.5,
-		GameData.PLAYER_Y
+		BoardGeometry.GRID_ORIGIN_X + player_lane * BoardGeometry.CELL_WIDTH + BoardGeometry.CELL_WIDTH * 0.5,
+		BoardGeometry.PLAYER_Y
 	)
 
 # ── Déplacement ──────────────────────────────────────────────────
@@ -37,8 +37,8 @@ func move(dir: int):
 	player_lane = clamp(player_lane + dir, 0, GameData.LANES - 1)
 	var tw = create_tween()
 	tw.tween_property(player_node, "position",
-		Vector2(GameData.GRID_X + player_lane * GameData.LANE_W + GameData.LANE_W * 0.5,
-				GameData.PLAYER_Y), 0.08)
+		Vector2(BoardGeometry.GRID_ORIGIN_X + player_lane * BoardGeometry.CELL_WIDTH + BoardGeometry.CELL_WIDTH * 0.5,
+				BoardGeometry.PLAYER_Y), 0.08)
 	hud.update_lane(player_lane + 1)
 	if is_instance_valid(weapons_ref):
 		weapons_ref.player_lane = player_lane

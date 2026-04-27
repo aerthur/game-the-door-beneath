@@ -16,10 +16,7 @@ var boss_scene = preload("res://scenes/monster_boss.tscn")
 
 # ── Helper position grille ───────────────────────────────────────
 func grid_pos(row: int, lane: int) -> Vector2:
-	return Vector2(
-		GameData.GRID_X + lane * GameData.LANE_W + GameData.LANE_W * 0.5,
-		GameData.GRID_Y + row  * GameData.ROW_H  + GameData.ROW_H  * 0.5
-	)
+	return BoardGeometry.get_cell_center(row, lane)
 
 # ── Composition de la salle ──────────────────────────────────────
 func get_composition(room: int) -> Array:

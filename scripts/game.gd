@@ -69,8 +69,7 @@ func _init_grid():
 		grid.append(row)
 
 func grid_pos(row: int, lane: int) -> Vector2:
-	return Vector2(GameData.GRID_X + lane * GameData.LANE_W + GameData.LANE_W * 0.5,
-				   GameData.GRID_Y + row  * GameData.ROW_H  + GameData.ROW_H  * 0.5)
+	return BoardGeometry.get_cell_center(row, lane)
 
 # ── Fond ─────────────────────────────────────────────────────────
 func _draw_background():
@@ -258,12 +257,12 @@ func _spawn_gem(lane: int, pos: Vector2, xp_val: int):
 	bg.add_child(g)
 	active_gems.append({"node": g, "lane": lane})
 
-	var fixed_x = GameData.GRID_X + lane * GameData.LANE_W + GameData.LANE_W * 0.5
+	var fixed_x = BoardGeometry.GRID_ORIGIN_X + lane * BoardGeometry.CELL_WIDTH + BoardGeometry.CELL_WIDTH * 0.5
 	g.position.x = fixed_x
-	var dist     = abs((GameData.PLAYER_Y - 10) - g.position.y)
+	var dist     = abs((BoardGeometry.PLAYER_Y - 10) - g.position.y)
 	var duration = dist / 380.0
 	var tw = create_tween()
-	tw.tween_property(g, "position:y", GameData.PLAYER_Y - 10, duration)
+	tw.tween_property(g, "position:y", BoardGeometry.PLAYER_Y - 10, duration)
 	await tw.finished
 	if not is_instance_valid(g): return
 	g.position.x = fixed_x
