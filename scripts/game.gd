@@ -63,6 +63,13 @@ func _ready():
 # ── Grille ───────────────────────────────────────────────────────
 func _init_grid():
 	board_state.clear_all()
+	_setup_test_obstacles()
+
+# Obstacles de test — à retirer ou adapter quand les salles seront data-driven.
+func _setup_test_obstacles():
+	var wall = ObstacleData.make_wall()
+	board_state.set_obstacle(3, 1, wall)
+	board_state.set_obstacle(3, 3, wall)
 
 func grid_pos(row: int, lane: int) -> Vector2:
 	return BoardGeometry.get_cell_center(row, lane)
@@ -86,6 +93,26 @@ func _draw_background():
 		lbl.position = Vector2(BoardGeometry.GRID_ORIGIN_X + l * BoardGeometry.CELL_WIDTH + BoardGeometry.CELL_WIDTH * 0.5 - 10,
 							   BoardGeometry.GRID_ORIGIN_Y + BoardGeometry.GRID_ROWS * BoardGeometry.CELL_HEIGHT + 4)
 		lbl.add_theme_color_override("font_color", Color(0.45, 0.45, 0.45))
+		bg.add_child(lbl)
+	_draw_obstacles()
+
+# Dessine les obstacles de test comme overlays sur les cellules concernées.
+func _draw_obstacles():
+	var test_cells = [[3, 1], [3, 3]]
+	for coord in test_cells:
+		var r : int = coord[0]
+		var l : int = coord[1]
+		var rect = ColorRect.new()
+		rect.position = Vector2(
+			BoardGeometry.GRID_ORIGIN_X + l * BoardGeometry.CELL_WIDTH + 1,
+			BoardGeometry.GRID_ORIGIN_Y + r * BoardGeometry.CELL_HEIGHT + 1)
+		rect.size  = Vector2(BoardGeometry.CELL_WIDTH - 3, BoardGeometry.CELL_HEIGHT - 3)
+		rect.color = Color(0.28, 0.22, 0.12, 0.92)
+		bg.add_child(rect)
+		var lbl = Label.new()
+		lbl.text = "▪"
+		lbl.position = rect.position + Vector2(BoardGeometry.CELL_WIDTH * 0.5 - 8, BoardGeometry.CELL_HEIGHT * 0.5 - 10)
+		lbl.add_theme_color_override("font_color", Color(0.55, 0.45, 0.30))
 		bg.add_child(lbl)
 
 # ── Salle ────────────────────────────────────────────────────────
@@ -156,7 +183,7 @@ func _do_tick():
 						player_ctrl.hit(dmg)
 					_on_monster_escaped(l, mtype)
 			else:
-				if board_state.is_cell_free(new_row, l):
+				if board_state.is_cell_free(new_row, l) and not board_state.is_cell_blocked(new_row, l):
 					board_state.set_cell_occupied(new_row, l, m)
 					board_state.clear_cell(r, l)
 					m.grid_row  = new_row

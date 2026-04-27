@@ -100,7 +100,7 @@ func spawn_monster(monster_id: String, spawn_ctx: Dictionary) -> bool:
 	if target_lane == -1: return false   # toutes colonnes pleines
 
 	var r : int = resolved["row"]
-	while r < BoardGeometry.GRID_ROWS and board_state.is_cell_occupied(r, target_lane):
+	while r < BoardGeometry.GRID_ROWS and (board_state.is_cell_occupied(r, target_lane) or board_state.is_cell_blocked(r, target_lane)):
 		r += 1
 	if r >= BoardGeometry.GRID_ROWS: return false
 
@@ -114,11 +114,11 @@ func spawn_monster(monster_id: String, spawn_ctx: Dictionary) -> bool:
 	return true
 
 func find_spawn_lane(preferred: int) -> int:
-	if board_state.is_cell_free(0, preferred):
+	if board_state.is_cell_free(0, preferred) and not board_state.is_cell_blocked(0, preferred):
 		return preferred
 	for offset in [1, -1, 2, -2, 3, -3, 4, -4]:
 		var l = preferred + offset
-		if l >= 0 and l < BoardGeometry.GRID_COLUMNS and board_state.is_cell_free(0, l):
+		if l >= 0 and l < BoardGeometry.GRID_COLUMNS and board_state.is_cell_free(0, l) and not board_state.is_cell_blocked(0, l):
 			return l
 	return -1
 
