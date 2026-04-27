@@ -21,9 +21,7 @@ game-the-door-beneath/
 │   ├── title_screen.tscn       ← scène principale au démarrage (menu + meilleurs scores)
 │   ├── main.tscn               ← scène de jeu (lancée depuis title_screen)
 │   ├── player.tscn             ← archer joueur (Node2D + polygones)
-│   ├── monster_blob.tscn       ← gobelin vert
-│   ├── monster_blue.tscn       ← gobelin bleu
-│   ├── monster_red.tscn        ← gobelin rouge
+│   ├── monster_base.tscn       ← scène réutilisable pour tous les gobelins (palette appliquée au runtime)
 │   ├── monster_boss.tscn       ← boss (2× visuel, couronne, barre de vie)
 │   ├── gem.tscn                ← gemme XP (Polygon2D diamond)
 │   └── ui/
@@ -31,16 +29,15 @@ game-the-door-beneath/
 └── scripts/
     ├── title_screen.gd         ← menu principal + affichage meilleurs scores
     ├── game.gd                 ← coordinateur principal (état, tick, room)
-    ├── game_constants.gd       ← class_name GameData (constantes, ROOM_WAVES, WEAPON_DEFS, LORE_TEXTS)
+    ├── game_constants.gd       ← class_name GameData (ROOM_WAVES, WEAPON_DEFS, MONSTER_DEFS, LORE_TEXTS)
+    ├── board_geometry.gd       ← class_name BoardGeometry (géométrie grille 5×8, helpers statiques)
+    ├── monster.gd              ← class_name Monster (classe de base de tous les monstres)
     ├── game_enemies.gd         ← spawn, placement, retraite des ennemis ($Enemies)
     ├── game_player.gd          ← état/input joueur ($PlayerCtrl)
     ├── game_weapons.gd         ← logique de tir des 8 armes ($Weapons)
     ├── game_visuals.gd         ← animations et effets ($Visuals)
     ├── game_records.gd         ← records persistants JSON ($Records)
     ├── hud.gd                  ← logique HUD
-    ├── monster_blob.gd         ← stats gobelin vert
-    ├── monster_blue.gd         ← stats gobelin bleu
-    ├── monster_red.gd          ← stats gobelin rouge
     ├── monster_boss.gd         ← boss (is_boss=true, hp_max, barre de vie)
     └── gem.gd                  ← gemme XP
 ```
@@ -77,25 +74,57 @@ records_ctrl.hud = hud
 
 ### GameData — constantes partagées
 
-`game_constants.gd` déclare `class_name GameData`. Toutes les constantes sont accessibles via `GameData.X` depuis n'importe quel script :
+`game_constants.gd` déclare `class_name GameData`. Accessible via `GameData.X` depuis n'importe quel script :
 
 ```gdscript
-GameData.LANES    # 5
-GameData.ROWS     # 8
-GameData.LANE_W   # 180
-GameData.ROW_H    # 68
-GameData.GRID_X   # (1280 - LANES * LANE_W) / 2
-GameData.GRID_Y   # 30
-GameData.PLAYER_Y # GRID_Y + ROWS * ROW_H + 24
 GameData.ROOM_WAVES    # Dict salle → liste types monstres
 GameData.WEAPON_DEFS   # Dict id → {name, base_dmg, cd, desc, icon}
+GameData.MONSTER_DEFS  # Dict id → def complète (hp, damage, scene, palette, …)
 GameData.LORE_TEXTS    # Dict salle → texte lore (salles 1–15)
+```
+
+> ⚠️ Les constantes de géométrie (`LANES`, `ROWS`, `LANE_W`, etc.) ont été **migrées dans `BoardGeometry`**. Ne plus les chercher dans `GameData`.
+
+### BoardGeometry — géométrie de la grille
+
+`board_geometry.gd` déclare `class_name BoardGeometry`. Constantes et helpers statiques pour la grille 5×8 :
+
+```gdscript
+BoardGeometry.GRID_COLUMNS   # 5
+BoardGeometry.GRID_ROWS      # 8
+BoardGeometry.CELL_WIDTH     # 180
+BoardGeometry.CELL_HEIGHT    # 68
+BoardGeometry.GRID_ORIGIN_X  # 140  — (1280 - 5*180) / 2
+BoardGeometry.GRID_ORIGIN_Y  # 30
+BoardGeometry.PLAYER_Y       # 598  — bas de grille + 24
+
+BoardGeometry.get_cell_center(row, col) -> Vector2
+BoardGeometry.cell_to_world(row, col)   -> Vector2
+BoardGeometry.world_to_cell(pos)        -> Vector2i
+BoardGeometry.is_valid_cell(row, col)   -> bool
+```
+
+### Monster — classe de base
+
+`monster.gd` déclare `class_name Monster` (extends Node2D). Tous les monstres en héritent.
+
+Variables exposées : `hp`, `hp_max`, `damage`, `move_speed`, `frozen_ticks`, `xp_value`, `monster_type`, `is_boss`, `grid_row`, `grid_lane`, `behavior`, `palette`, `tags`.
+
+API publique :
+```gdscript
+monster.setup_from_def(monster_id, def)  # initialise depuis MONSTER_DEFS
+monster.take_damage(amount)              # réduit hp + flash rouge
+monster.freeze(ticks)                    # gel + teinte bleue
+monster.tick_freeze()                    # appelé à chaque tick (décrémente)
+monster.on_tick()                        # hook comportement (override dans sous-classes)
+monster.apply_palette(palette)           # applique les couleurs sur les Polygon2D
 ```
 
 ### Variables d'état (game.gd)
 
 ```gdscript
-var player_hp          : int   # PV joueur (max 100)
+var player_hp          : int   # PV joueur courants
+var player_max         : int   # PV joueur maximum (100 par défaut)
 var room_num           : int   # salle actuelle (1–10+)
 var gold_current       : int   # or disponible (affiché dans HUD)
 var gold_total_earned  : int   # or total gagné depuis le début de la run
@@ -199,25 +228,32 @@ Max 4 armes actives simultanément.
 
 ## Monstres (Mode Lanes)
 
-| type | monster_type | hp | dmg | speed | xp |
+Tous les monstres standards utilisent `monster_base.tscn` + `class Monster`. Les stats et couleurs viennent de `GameData.MONSTER_DEFS`.
+
+| id | Nom | HP | Dmg | Speed | XP |
 |---|---|---|---|---|---|
-| Gobelin vert | "g" | 30 | 12 | 1 | 25 |
-| Gobelin bleu | "b" | 55 | 20 | 1 | 50 |
-| Gobelin rouge | "r" | 90 | 30 | 2 | 100 |
+| "g" | Gobelin vert | 30 | 12 | 1 | 25 |
+| "b" | Gobelin bleu | 55 | 20 | 1 | 50 |
+| "r" | Gobelin rouge | 90 | 30 | 2 | 100 |
 
 `move_speed` = nombre de rangées parcourues par tick.
 
 ## Boss (toutes les 5 salles)
 
-| Salle | Type | HP | Dmg | Speed | XP |
-|---|---|---|---|---|---|
-| 5 | "g" | 300 | 25 | 1 | 500 |
-| 10 | "b" | 600 | 40 | 1 | 1000 |
-| 15 | "r" | 1000 | 60 | 2 | 2000 |
-| 20+ | "r" | ×1.5/tranche | ×1.5/tranche | 2 | ×1.5/tranche |
+Les boss sont **data-driven** via `GameData.MONSTER_DEFS` (`boss_g`, `boss_b`, `boss_r`). `game_enemies.spawn_boss(room_num)` sélectionne l'id selon les seuils :
 
-- Spawne en lane 2, row 0 (`monsters_remaining = 1`)
-- Échappement : inflige dmg sur lanes ±1 (clampé), remonte row 0 soigné +30% HP max
+| Seuil | id | Nom | HP | Dmg | Speed | XP |
+|---|---|---|---|---|---|---|
+| room < 10 | "boss_g" | Boss Gobelin vert | 300 | 25 | 1 | 500 |
+| room >= 10 | "boss_b" | Boss Gobelin bleu | 600 | 40 | 1 | 1000 |
+| room >= 15 | "boss_r" | Boss Gobelin rouge | 1000 | 60 | 2 | 2000 |
+| room > 15 | "boss_r" | (scalé) | ×1.5 / 5 salles | idem | 2 | ×1.5 / 5 salles |
+
+Scaling : `pow(1.5, (room - 15) / 5)` appliqué à hp, damage, xp_value au moment du spawn (def dupliquée, MONSTER_DEFS inchangé).
+
+- Spawne en lane 2 (index 2), row 0 — `monsters_remaining = 1`
+- `monster_boss.gd` extends `Monster` — surcharge `setup_from_def()` (appel super) et `_on_damage_taken()` (update barre de vie)
+- Retraite : soigné +30% HP max, remonte row 0 dans sa lane via `enemies.boss_retreat()`
 
 ---
 
@@ -319,9 +355,9 @@ Ce système est conçu pour supporter un futur mode où les ennemis spawneraient
 4. `game_enemies._get_scene()` chargera et cachera la scène automatiquement
 
 ### Nouveau boss
-1. Ajouter une entrée `"boss_XXX"` dans `MONSTER_DEFS` avec `"is_boss": true`, `"tags": ["boss"]`, `"scene": "res://scenes/monster_boss.tscn"` et `"monster_type": "X"` (type de base pour records)
-2. Ajouter le cas dans `game_enemies.spawn_boss()` si la salle de déclenchement diffère du pattern ×5 existant
-3. La barre de vie et la couronne sont créées automatiquement par `monster_boss.gd` via la palette
+1. Ajouter une entrée `"boss_XXX"` dans `MONSTER_DEFS` avec `"is_boss": true`, `"tags": ["boss"]`, `"scene": "res://scenes/monster_boss.tscn"`, `"monster_type": "X"` et une `"palette"` (la couleur de la barre de vie est `palette["main"]`)
+2. Mettre à jour les seuils dans `game_enemies.spawn_boss()` pour inclure le nouveau boss
+3. La barre de vie et la couronne sont créées automatiquement par `monster_boss.gd` (extends Monster) via la palette — aucun code supplémentaire
 
 ### Comportement spécial futur
 1. Créer `scripts/monster_behavior_XXX.gd` (extends Monster)
