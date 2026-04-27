@@ -22,7 +22,8 @@ var board_state : BoardState = BoardState.new()
 var active_gems : Array = []
 
 var tick_acc      : float = 0.0
-var tick_interval : float = 1.0
+var tick_interval : float = 0.5   # demi-tick : rapides avancent chaque demi-tick, lents tous les 2
+var _tick_index   : int   = 0
 
 @onready var monsters_node  : Node2D      = $Monsters
 @onready var player_node    : Node2D      = $Player
@@ -157,14 +158,17 @@ func _process(delta: float):
 
 # ── Tick ─────────────────────────────────────────────────────────
 func _do_tick():
+	_tick_index += 1
 	for r in range(BoardGeometry.GRID_ROWS - 1, -1, -1):
 		for l in range(BoardGeometry.GRID_COLUMNS):
 			var m = board_state.get_cell_occupant(r, l)
 			if m == null: continue
+			# Monstres lents (move_speed=1) : seulement les demi-ticks pairs
+			if m.move_speed < 2 and _tick_index % 2 != 0: continue
 			m.tick_freeze()
 			if m.frozen_ticks > 0: continue
 
-			var new_row = r + m.move_speed
+			var new_row = r + 1  # toujours 1 case, peu importe move_speed
 			if new_row >= BoardGeometry.GRID_ROWS:
 				var dmg   = m.damage
 				var mtype = m.monster_type

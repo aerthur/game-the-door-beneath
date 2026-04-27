@@ -91,13 +91,12 @@ func _w_givre(w: Dictionary):
 			visuals.shoot_arrow(player_lane, r, 0.2, Color(0.4, 0.85, 1.0), 3.0)
 			await get_tree().create_timer(0.2).timeout
 			if is_instance_valid(m):
-				m.freeze(2)
+				m.freeze(4)  # 4 demi-ticks = 2s effectifs (doublé pour compenser tick_interval=0.5)
 				deal_fn.call(m, r, player_lane, get_dmg(w))
 			return
 
 func _w_sismique(w: Dictionary):
-	visuals.show_quake()
 	for r in [BoardGeometry.GRID_ROWS - 1, BoardGeometry.GRID_ROWS - 2]:
 		for l in BoardGeometry.GRID_COLUMNS:
-			if r >= 0 and board_state.is_cell_occupied(r, l):
+			if board_state.is_cell_occupied(r, l):
 				deal_fn.call(board_state.get_cell_occupant(r, l), r, l, get_dmg(w))
