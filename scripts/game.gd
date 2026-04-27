@@ -63,14 +63,13 @@ func _ready():
 # ── Grille ───────────────────────────────────────────────────────
 func _init_grid():
 	grid.clear()
-	for _r in GameData.ROWS:
+	for _r in BoardGeometry.GRID_ROWS:
 		var row = []
-		for _l in GameData.LANES: row.append(null)
+		for _l in BoardGeometry.GRID_COLUMNS: row.append(null)
 		grid.append(row)
 
 func grid_pos(row: int, lane: int) -> Vector2:
-	return Vector2(GameData.GRID_X + lane * GameData.LANE_W + GameData.LANE_W * 0.5,
-				   GameData.GRID_Y + row  * GameData.ROW_H  + GameData.ROW_H  * 0.5)
+	return BoardGeometry.get_cell_center(row, lane)
 
 # ── Fond ─────────────────────────────────────────────────────────
 func _draw_background():
@@ -78,18 +77,18 @@ func _draw_background():
 	floor_rect.color = Color(0.07, 0.05, 0.04)
 	floor_rect.size  = Vector2(1280, 720)
 	bg.add_child(floor_rect)
-	for r in GameData.ROWS:
-		for l in GameData.LANES:
+	for r in BoardGeometry.GRID_ROWS:
+		for l in BoardGeometry.GRID_COLUMNS:
 			var cell = ColorRect.new()
-			cell.position = Vector2(GameData.GRID_X + l * GameData.LANE_W, GameData.GRID_Y + r * GameData.ROW_H)
-			cell.size     = Vector2(GameData.LANE_W - 2, GameData.ROW_H - 2)
+			cell.position = Vector2(BoardGeometry.GRID_ORIGIN_X + l * BoardGeometry.CELL_WIDTH, BoardGeometry.GRID_ORIGIN_Y + r * BoardGeometry.CELL_HEIGHT)
+			cell.size     = Vector2(BoardGeometry.CELL_WIDTH - 2, BoardGeometry.CELL_HEIGHT - 2)
 			cell.color    = Color(0.13, 0.10, 0.08) if (r + l) % 2 == 0 else Color(0.11, 0.09, 0.07)
 			bg.add_child(cell)
-	for l in GameData.LANES:
+	for l in BoardGeometry.GRID_COLUMNS:
 		var lbl = Label.new()
 		lbl.text = "F%d" % (l + 1)
-		lbl.position = Vector2(GameData.GRID_X + l * GameData.LANE_W + GameData.LANE_W * 0.5 - 10,
-							   GameData.GRID_Y + GameData.ROWS * GameData.ROW_H + 4)
+		lbl.position = Vector2(BoardGeometry.GRID_ORIGIN_X + l * BoardGeometry.CELL_WIDTH + BoardGeometry.CELL_WIDTH * 0.5 - 10,
+							   BoardGeometry.GRID_ORIGIN_Y + BoardGeometry.GRID_ROWS * BoardGeometry.CELL_HEIGHT + 4)
 		lbl.add_theme_color_override("font_color", Color(0.45, 0.45, 0.45))
 		bg.add_child(lbl)
 
@@ -135,22 +134,22 @@ func _process(delta: float):
 
 # ── Tick ─────────────────────────────────────────────────────────
 func _do_tick():
-	for r in range(GameData.ROWS - 1, -1, -1):
-		for l in range(GameData.LANES):
+	for r in range(BoardGeometry.GRID_ROWS - 1, -1, -1):
+		for l in range(BoardGeometry.GRID_COLUMNS):
 			var m = grid[r][l]
 			if m == null: continue
 			m.tick_freeze()
 			if m.frozen_ticks > 0: continue
 
 			var new_row = r + m.move_speed
-			if new_row >= GameData.ROWS:
+			if new_row >= BoardGeometry.GRID_ROWS:
 				var dmg   = m.damage
 				var mtype = m.monster_type
 				grid[r][l] = null
 				if m.is_boss:
 					var hit_lanes : Dictionary = {}
 					for dl in [-1, 0, 1]:
-						hit_lanes[clamp(l + dl, 0, GameData.LANES - 1)] = true
+						hit_lanes[clamp(l + dl, 0, BoardGeometry.GRID_COLUMNS - 1)] = true
 					for tl in hit_lanes:
 						if tl == player_ctrl.player_lane:
 							player_ctrl.hit(dmg)
@@ -234,8 +233,8 @@ func _check_room_clear():
 		_room_cleared()
 
 func _grid_empty() -> bool:
-	for r in GameData.ROWS:
-		for l in GameData.LANES:
+	for r in BoardGeometry.GRID_ROWS:
+		for l in BoardGeometry.GRID_COLUMNS:
 			if grid[r][l] != null: return false
 	return true
 
@@ -258,12 +257,12 @@ func _spawn_gem(lane: int, pos: Vector2, xp_val: int):
 	bg.add_child(g)
 	active_gems.append({"node": g, "lane": lane})
 
-	var fixed_x = GameData.GRID_X + lane * GameData.LANE_W + GameData.LANE_W * 0.5
+	var fixed_x = BoardGeometry.GRID_ORIGIN_X + lane * BoardGeometry.CELL_WIDTH + BoardGeometry.CELL_WIDTH * 0.5
 	g.position.x = fixed_x
-	var dist     = abs((GameData.PLAYER_Y - 10) - g.position.y)
+	var dist     = abs((BoardGeometry.PLAYER_Y - 10) - g.position.y)
 	var duration = dist / 380.0
 	var tw = create_tween()
-	tw.tween_property(g, "position:y", GameData.PLAYER_Y - 10, duration)
+	tw.tween_property(g, "position:y", BoardGeometry.PLAYER_Y - 10, duration)
 	await tw.finished
 	if not is_instance_valid(g): return
 	g.position.x = fixed_x

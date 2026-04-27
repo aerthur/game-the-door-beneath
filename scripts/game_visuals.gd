@@ -8,10 +8,7 @@ var bg: Node2D  # défini par game.gd
 
 # ── Helper position grille ───────────────────────────────────────
 func grid_pos(row: int, lane: int) -> Vector2:
-	return Vector2(
-		GameData.GRID_X + lane * GameData.LANE_W + GameData.LANE_W * 0.5,
-		GameData.GRID_Y + row  * GameData.ROW_H  + GameData.ROW_H  * 0.5
-	)
+	return BoardGeometry.get_cell_center(row, lane)
 
 # ── Visuels d'attaque ────────────────────────────────────────────
 func shoot_arrow(lane: int, target_row: int, duration: float,
@@ -27,7 +24,7 @@ func shoot_arrow(lane: int, target_row: int, duration: float,
 	var feather = ColorRect.new()
 	feather.size = Vector2(12, 4); feather.position = Vector2(-6, -4)
 	feather.color = Color(0.9, 0.88, 0.78); arrow.add_child(feather)
-	arrow.position = Vector2(GameData.GRID_X + lane * GameData.LANE_W + GameData.LANE_W * 0.5, GameData.PLAYER_Y - 35)
+	arrow.position = Vector2(BoardGeometry.GRID_ORIGIN_X + lane * BoardGeometry.CELL_WIDTH + BoardGeometry.CELL_WIDTH * 0.5, BoardGeometry.PLAYER_Y - 35)
 	bg.add_child(arrow)
 	var tw = create_tween()
 	tw.tween_property(arrow, "position", grid_pos(target_row, lane), duration)
@@ -44,16 +41,16 @@ func show_slash(lane: int, row: int):
 
 func show_explosion(lane: int, row: int):
 	var exp = ColorRect.new()
-	exp.size = Vector2(GameData.LANE_W - 4, GameData.ROW_H - 4)
-	exp.position = Vector2(GameData.GRID_X + lane * GameData.LANE_W + 2, GameData.GRID_Y + row * GameData.ROW_H + 2)
+	exp.size = Vector2(BoardGeometry.CELL_WIDTH - 4, BoardGeometry.CELL_HEIGHT - 4)
+	exp.position = Vector2(BoardGeometry.GRID_ORIGIN_X + lane * BoardGeometry.CELL_WIDTH + 2, BoardGeometry.GRID_ORIGIN_Y + row * BoardGeometry.CELL_HEIGHT + 2)
 	exp.color = Color(1.0, 0.55, 0.1, 0.70); bg.add_child(exp)
 	await get_tree().create_timer(0.15).timeout
 	if is_instance_valid(exp): exp.queue_free()
 
 func show_lightning(lane: int, row: int):
 	var bolt = Line2D.new()
-	var sx = GameData.GRID_X + lane * GameData.LANE_W + GameData.LANE_W * 0.5
-	bolt.add_point(Vector2(sx, GameData.PLAYER_Y))
+	var sx = BoardGeometry.GRID_ORIGIN_X + lane * BoardGeometry.CELL_WIDTH + BoardGeometry.CELL_WIDTH * 0.5
+	bolt.add_point(Vector2(sx, BoardGeometry.PLAYER_Y))
 	bolt.add_point(Vector2(sx + randf_range(-12, 12), grid_pos(row, lane).y))
 	bolt.width = 4.0; bolt.default_color = Color(0.6, 0.6, 1.0, 0.9)
 	bg.add_child(bolt)
@@ -62,16 +59,16 @@ func show_lightning(lane: int, row: int):
 
 func show_whirlwind():
 	var rect = ColorRect.new()
-	rect.size = Vector2(GameData.LANES * GameData.LANE_W, GameData.ROW_H)
-	rect.position = Vector2(GameData.GRID_X, GameData.GRID_Y + (GameData.ROWS - 1) * GameData.ROW_H)
+	rect.size = Vector2(BoardGeometry.GRID_COLUMNS * BoardGeometry.CELL_WIDTH, BoardGeometry.CELL_HEIGHT)
+	rect.position = Vector2(BoardGeometry.GRID_ORIGIN_X, BoardGeometry.GRID_ORIGIN_Y + (BoardGeometry.GRID_ROWS - 1) * BoardGeometry.CELL_HEIGHT)
 	rect.color = Color(0.8, 0.5, 1.0, 0.35); bg.add_child(rect)
 	await get_tree().create_timer(0.18).timeout
 	if is_instance_valid(rect): rect.queue_free()
 
 func show_quake():
 	var rect = ColorRect.new()
-	rect.size = Vector2(GameData.LANES * GameData.LANE_W, GameData.ROW_H * 2)
-	rect.position = Vector2(GameData.GRID_X, GameData.GRID_Y + (GameData.ROWS - 2) * GameData.ROW_H)
+	rect.size = Vector2(BoardGeometry.GRID_COLUMNS * BoardGeometry.CELL_WIDTH, BoardGeometry.CELL_HEIGHT * 2)
+	rect.position = Vector2(BoardGeometry.GRID_ORIGIN_X, BoardGeometry.GRID_ORIGIN_Y + (BoardGeometry.GRID_ROWS - 2) * BoardGeometry.CELL_HEIGHT)
 	rect.color = Color(0.9, 0.65, 0.2, 0.40); bg.add_child(rect)
 	var cam = get_viewport().get_camera_2d()
 	if cam:
@@ -350,8 +347,8 @@ func play_door_animation(room_num: int, player_lane: int, add_gold_fn: Callable)
 	# +Or au-dessus du joueur
 	var gold_bonus = _get_room_gold_bonus(room_num)
 	add_gold_fn.call(gold_bonus)
-	var pcx = GameData.GRID_X + player_lane * GameData.LANE_W + GameData.LANE_W * 0.5
-	var py  = float(GameData.PLAYER_Y) - 80.0
+	var pcx = BoardGeometry.GRID_ORIGIN_X + player_lane * BoardGeometry.CELL_WIDTH + BoardGeometry.CELL_WIDTH * 0.5
+	var py  = float(BoardGeometry.PLAYER_Y) - 80.0
 	var gold_lbl = Label.new()
 	gold_lbl.text = "+%d 💰" % gold_bonus
 	gold_lbl.custom_minimum_size = Vector2(200, 0)

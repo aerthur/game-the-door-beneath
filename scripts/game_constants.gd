@@ -1,14 +1,5 @@
 class_name GameData
 
-# ── Grille ───────────────────────────────────────────────────────
-const LANES    = 5
-const ROWS     = 8
-const LANE_W   = 180
-const ROW_H    = 68
-const GRID_X   = (1280 - LANES * LANE_W) / 2
-const GRID_Y   = 30
-const PLAYER_Y = GRID_Y + ROWS * ROW_H + 24
-
 # ── Composition des salles ───────────────────────────────────────
 const ROOM_WAVES = {
 	1:  ["g","g","g"],
