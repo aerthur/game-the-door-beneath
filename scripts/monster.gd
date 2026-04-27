@@ -11,6 +11,9 @@ var monster_type : String = ""
 var is_boss      : bool = false
 var grid_row     : int = 0
 var grid_lane    : int = 0
+var behavior     : String = "standard"
+var palette      : Dictionary = {}
+var tags         : Array = []
 
 func take_damage(amount: int) -> void:
 	hp -= amount
@@ -39,8 +42,16 @@ func setup_from_def(monster_id: String, def: Dictionary) -> void:
 	move_speed   = def["move_speed"]
 	xp_value     = def["xp_value"]
 	is_boss      = def.get("is_boss", false)
+	behavior     = def.get("behavior", "standard")
+	tags         = def.get("tags", []).duplicate()
 	if def.has("palette"):
-		apply_palette(def["palette"])
+		palette = def["palette"].duplicate()
+		apply_palette(palette)
+
+# Point d'extension comportement — appelé à chaque tick de mouvement.
+# Comportements spéciaux (ex: "charge", "split") surchargent cette méthode.
+func on_tick() -> void:
+	pass
 
 func apply_palette(palette: Dictionary) -> void:
 	var main_c = palette.get("main", Color.WHITE)

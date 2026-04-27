@@ -9,8 +9,12 @@ extends Node2D
 var monsters_node : Node2D
 var grid          : Array   # référence partagée avec game.gd
 
-var monster_base_scene = preload("res://scenes/monster_base.tscn")
-var boss_scene         = preload("res://scenes/monster_boss.tscn")
+var _scene_cache  : Dictionary = {}  # scene_path → PackedScene
+
+func _get_scene(scene_path: String) -> PackedScene:
+	if not _scene_cache.has(scene_path):
+		_scene_cache[scene_path] = load(scene_path)
+	return _scene_cache[scene_path]
 
 # ── Helper position grille ───────────────────────────────────────
 func grid_pos(row: int, lane: int) -> Vector2:
@@ -48,7 +52,7 @@ func spawn_boss(room_num: int) -> int:
 		def["damage"]   = int(def["damage"]   * mult)
 		def["xp_value"] = int(def["xp_value"] * mult)
 
-	var boss = boss_scene.instantiate()
+	var boss = _get_scene(def["scene"]).instantiate()
 	boss.setup_from_def(boss_id, def)
 	monsters_node.add_child(boss)
 	boss.position  = grid_pos(0, 2)
@@ -100,7 +104,7 @@ func spawn_monster(monster_id: String, spawn_ctx: Dictionary) -> bool:
 		r += 1
 	if r >= BoardGeometry.GRID_ROWS: return false
 
-	var m = monster_base_scene.instantiate()
+	var m = _get_scene(def["scene"]).instantiate()
 	m.setup_from_def(monster_id, def)
 	monsters_node.add_child(m)
 	m.position           = grid_pos(r, target_lane)

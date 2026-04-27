@@ -44,6 +44,7 @@ const MONSTER_DEFS = {
 		"move_speed": 1,
 		"xp_value":   25,
 		"is_boss":    false,
+		"tags":       [],
 		"palette": {
 			"main": Color(0.25, 0.52, 0.14),
 			"dark": Color(0.22, 0.48, 0.12),
@@ -60,6 +61,7 @@ const MONSTER_DEFS = {
 		"move_speed": 1,
 		"xp_value":   50,
 		"is_boss":    false,
+		"tags":       [],
 		"palette": {
 			"main": Color(0.18, 0.30, 0.78),
 			"dark": Color(0.15, 0.25, 0.70),
@@ -76,6 +78,7 @@ const MONSTER_DEFS = {
 		"move_speed": 2,
 		"xp_value":   100,
 		"is_boss":    false,
+		"tags":       [],
 		"palette": {
 			"main": Color(0.80, 0.12, 0.08),
 			"dark": Color(0.72, 0.10, 0.08),
@@ -95,6 +98,7 @@ const MONSTER_DEFS = {
 		"xp_value":     500,
 		"is_boss":      true,
 		"monster_type": "g",
+		"tags":         ["boss"],
 		"palette": {
 			"main": Color(0.25, 0.52, 0.14),
 			"dark": Color(0.22, 0.48, 0.12),
@@ -112,6 +116,7 @@ const MONSTER_DEFS = {
 		"xp_value":     1000,
 		"is_boss":      true,
 		"monster_type": "b",
+		"tags":         ["boss"],
 		"palette": {
 			"main": Color(0.22, 0.35, 0.75),
 			"dark": Color(0.18, 0.30, 0.68),
@@ -129,6 +134,7 @@ const MONSTER_DEFS = {
 		"xp_value":     2000,
 		"is_boss":      true,
 		"monster_type": "r",
+		"tags":         ["boss"],
 		"palette": {
 			"main": Color(0.75, 0.18, 0.12),
 			"dark": Color(0.68, 0.15, 0.10),
