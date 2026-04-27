@@ -18,7 +18,7 @@ var game_over   : bool = false
 var leveling_up : bool = false
 
 var active_weapons : Array = [{"id": "arc", "level": 1, "acc": 0.0}]
-var grid        : Array = []
+var board_state : BoardState = BoardState.new()
 var active_gems : Array = []
 
 var tick_acc      : float = 0.0
@@ -43,8 +43,8 @@ func _ready():
 	records_ctrl.load_records()
 	visuals.bg = bg
 	enemies.monsters_node = monsters_node
-	enemies.grid  = grid
-	weapons.grid    = grid
+	enemies.board_state = board_state
+	weapons.board_state = board_state
 	weapons.visuals = visuals
 	weapons.deal_fn = _deal_and_check
 	player_ctrl.player_node = player_node
@@ -62,11 +62,7 @@ func _ready():
 
 # ── Grille ───────────────────────────────────────────────────────
 func _init_grid():
-	grid.clear()
-	for _r in BoardGeometry.GRID_ROWS:
-		var row = []
-		for _l in BoardGeometry.GRID_COLUMNS: row.append(null)
-		grid.append(row)
+	board_state.clear_all()
 
 func grid_pos(row: int, lane: int) -> Vector2:
 	return BoardGeometry.get_cell_center(row, lane)
@@ -136,7 +132,7 @@ func _process(delta: float):
 func _do_tick():
 	for r in range(BoardGeometry.GRID_ROWS - 1, -1, -1):
 		for l in range(BoardGeometry.GRID_COLUMNS):
-			var m = grid[r][l]
+			var m = board_state.get_cell_occupant(r, l)
 			if m == null: continue
 			m.tick_freeze()
 			if m.frozen_ticks > 0: continue
@@ -145,7 +141,7 @@ func _do_tick():
 			if new_row >= BoardGeometry.GRID_ROWS:
 				var dmg   = m.damage
 				var mtype = m.monster_type
-				grid[r][l] = null
+				board_state.clear_cell(r, l)
 				if m.is_boss:
 					var hit_lanes : Dictionary = {}
 					for dl in [-1, 0, 1]:
@@ -160,9 +156,9 @@ func _do_tick():
 						player_ctrl.hit(dmg)
 					_on_monster_escaped(l, mtype)
 			else:
-				if grid[new_row][l] == null:
-					grid[new_row][l] = m
-					grid[r][l] = null
+				if board_state.is_cell_free(new_row, l):
+					board_state.set_cell_occupied(new_row, l, m)
+					board_state.clear_cell(r, l)
 					m.grid_row  = new_row
 					m.grid_lane = l
 					var tw = create_tween()
@@ -202,7 +198,7 @@ func _deal_and_check(m: Node2D, _row: int, _lane: int, dmg: int):
 		var row   = m.grid_row
 		var lane  = m.grid_lane
 		var mtype = m.monster_type
-		grid[row][lane] = null
+		board_state.clear_cell(row, lane)
 		var pos = m.position
 		m.queue_free()
 		visuals.play_death_anim(pos, mtype, false)
@@ -233,10 +229,7 @@ func _check_room_clear():
 		_room_cleared()
 
 func _grid_empty() -> bool:
-	for r in BoardGeometry.GRID_ROWS:
-		for l in BoardGeometry.GRID_COLUMNS:
-			if grid[r][l] != null: return false
-	return true
+	return board_state.is_grid_empty()
 
 func _room_cleared():
 	await visuals.play_door_animation(room_num, player_ctrl.player_lane, _add_gold)

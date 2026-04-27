@@ -3,11 +3,11 @@ extends Node2D
 # Logique de tir des 8 armes.
 # Doit être ajouté comme enfant du nœud Game dans main.tscn.
 # game.gd définit dans _ready() :
-#   weapons.grid        = grid          ← même référence Array
+#   weapons.board_state = board_state   ← source de vérité partagée
 #   weapons.visuals     = visuals
 #   weapons.deal_fn     = _deal_and_check  ← Callable
 
-var grid             : Array
+var board_state      : BoardState
 var visuals          : Node2D
 var deal_fn          : Callable  # func(m, row, lane, dmg)
 var player_lane      : int = 2   # mis à jour par game.gd à chaque déplacement
@@ -33,8 +33,8 @@ func fire(w: Dictionary):
 # ── 8 armes ──────────────────────────────────────────────────────
 func _w_arc(w: Dictionary):
 	for r in range(BoardGeometry.GRID_ROWS - 1, -1, -1):
-		if grid[r][player_lane] != null:
-			var m = grid[r][player_lane]
+		if board_state.is_cell_occupied(r, player_lane):
+			var m = board_state.get_cell_occupant(r, player_lane)
 			var t = 0.15 + r * 0.02
 			visuals.shoot_arrow(player_lane, r, t, Color(0.95, 0.85, 0.3))
 			await get_tree().create_timer(t).timeout
@@ -45,8 +45,8 @@ func _w_arbalete(w: Dictionary):
 	var hit = 0
 	for r in range(BoardGeometry.GRID_ROWS - 1, -1, -1):
 		if hit >= 2: break
-		if grid[r][player_lane] != null:
-			var m = grid[r][player_lane]
+		if board_state.is_cell_occupied(r, player_lane):
+			var m = board_state.get_cell_occupant(r, player_lane)
 			visuals.shoot_arrow(player_lane, r, 0.18 + r * 0.015, Color(0.6, 0.6, 1.0), 5.0)
 			await get_tree().create_timer(0.18 + r * 0.015).timeout
 			if is_instance_valid(m): deal_fn.call(m, r, player_lane, get_dmg(w))
@@ -54,39 +54,40 @@ func _w_arbalete(w: Dictionary):
 
 func _w_dague(w: Dictionary):
 	for r in range(BoardGeometry.GRID_ROWS - 1, -1, -1):
-		if grid[r][player_lane] != null:
+		if board_state.is_cell_occupied(r, player_lane):
 			visuals.show_slash(player_lane, r)
-			deal_fn.call(grid[r][player_lane], r, player_lane, get_dmg(w))
+			deal_fn.call(board_state.get_cell_occupant(r, player_lane), r, player_lane, get_dmg(w))
 			return
 
 func _w_bombe(w: Dictionary):
 	for l in [player_lane - 1, player_lane, player_lane + 1]:
 		if l < 0 or l >= BoardGeometry.GRID_COLUMNS: continue
 		for r in range(BoardGeometry.GRID_ROWS - 1, -1, -1):
-			if grid[r][l] != null:
+			if board_state.is_cell_occupied(r, l):
 				visuals.show_explosion(l, r)
 				await get_tree().create_timer(0.1).timeout
-				if grid[r][l] != null: deal_fn.call(grid[r][l], r, l, get_dmg(w))
+				if board_state.is_cell_occupied(r, l):
+					deal_fn.call(board_state.get_cell_occupant(r, l), r, l, get_dmg(w))
 				break
 
 func _w_eclair(w: Dictionary):
 	for r in range(BoardGeometry.GRID_ROWS - 1, -1, -1):
-		if grid[r][player_lane] != null:
+		if board_state.is_cell_occupied(r, player_lane):
 			visuals.show_lightning(player_lane, r)
-			deal_fn.call(grid[r][player_lane], r, player_lane, get_dmg(w))
+			deal_fn.call(board_state.get_cell_occupant(r, player_lane), r, player_lane, get_dmg(w))
 
 func _w_tourbillon(w: Dictionary):
 	visuals.show_whirlwind()
 	for l in BoardGeometry.GRID_COLUMNS:
 		for r in range(BoardGeometry.GRID_ROWS - 1, -1, -1):
-			if grid[r][l] != null:
-				deal_fn.call(grid[r][l], r, l, get_dmg(w))
+			if board_state.is_cell_occupied(r, l):
+				deal_fn.call(board_state.get_cell_occupant(r, l), r, l, get_dmg(w))
 				break
 
 func _w_givre(w: Dictionary):
 	for r in range(BoardGeometry.GRID_ROWS - 1, -1, -1):
-		if grid[r][player_lane] != null:
-			var m = grid[r][player_lane]
+		if board_state.is_cell_occupied(r, player_lane):
+			var m = board_state.get_cell_occupant(r, player_lane)
 			visuals.shoot_arrow(player_lane, r, 0.2, Color(0.4, 0.85, 1.0), 3.0)
 			await get_tree().create_timer(0.2).timeout
 			if is_instance_valid(m):
@@ -98,5 +99,5 @@ func _w_sismique(w: Dictionary):
 	visuals.show_quake()
 	for r in [BoardGeometry.GRID_ROWS - 1, BoardGeometry.GRID_ROWS - 2]:
 		for l in BoardGeometry.GRID_COLUMNS:
-			if r >= 0 and grid[r][l] != null:
-				deal_fn.call(grid[r][l], r, l, get_dmg(w))
+			if r >= 0 and board_state.is_cell_occupied(r, l):
+				deal_fn.call(board_state.get_cell_occupant(r, l), r, l, get_dmg(w))
