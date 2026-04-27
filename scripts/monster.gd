@@ -30,5 +30,13 @@ func tick_freeze() -> void:
 		if frozen_ticks == 0:
 			modulate = Color.WHITE
 
+func setup_from_def(monster_id: String, def: Dictionary) -> void:
+	monster_type = monster_id
+	hp           = def["hp"]
+	hp_max       = def["hp"]
+	damage       = def["damage"]
+	move_speed   = def["move_speed"]
+	xp_value     = def["xp_value"]
+
 func _on_damage_taken() -> void:
 	pass
