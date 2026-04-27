@@ -1,23 +1,15 @@
-extends Node2D
-
-var hp           : int = 300
-var hp_max       : int = 300
-var damage       : int = 25
-var move_speed   : int = 1
-var frozen_ticks : int = 0
-var xp_value     : int = 500
-var monster_type : String = "g"
-var is_boss      : bool = true
-
-var grid_row  : int = 0
-var grid_lane : int = 0
+extends Monster
 
 var health_bar : ProgressBar
 
-func _ready():
+func _ready() -> void:
+	is_boss = true
 	_apply_type_color()
 	_create_health_bar()
 	_create_crown()
+
+func _on_damage_taken() -> void:
+	update_health_bar()
 
 func _apply_type_color():
 	var main_col : Color
@@ -83,21 +75,3 @@ func _create_crown():
 func update_health_bar():
 	if is_instance_valid(health_bar):
 		health_bar.value = hp
-
-func take_damage(amount: int):
-	hp -= amount
-	update_health_bar()
-	modulate = Color(1, 0.2, 0.2)
-	await get_tree().create_timer(0.1).timeout
-	if is_inside_tree():
-		modulate = Color.WHITE if frozen_ticks == 0 else Color(0.5, 0.8, 1.0)
-
-func freeze(ticks: int):
-	frozen_ticks = max(frozen_ticks, ticks)
-	modulate = Color(0.5, 0.8, 1.0)
-
-func tick_freeze():
-	if frozen_ticks > 0:
-		frozen_ticks -= 1
-		if frozen_ticks == 0:
-			modulate = Color.WHITE
