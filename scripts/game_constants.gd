@@ -37,7 +37,7 @@ const LORE_TEXTS = {
 const MONSTER_DEFS = {
 	"g": {
 		"name":       "Gobelin vert",
-		"scene":      "res://scenes/monster_blob.tscn",
+		"scene":      "res://scenes/monster_base.tscn",
 		"behavior":   "standard",
 		"hp":         30,
 		"damage":     12,
@@ -48,11 +48,12 @@ const MONSTER_DEFS = {
 			"main": Color(0.25, 0.52, 0.14),
 			"dark": Color(0.22, 0.48, 0.12),
 			"nose": Color(0.18, 0.40, 0.10),
+			"eye":  Color(0.85, 0.70, 0.05),
 		},
 	},
 	"b": {
 		"name":       "Gobelin bleu",
-		"scene":      "res://scenes/monster_blue.tscn",
+		"scene":      "res://scenes/monster_base.tscn",
 		"behavior":   "standard",
 		"hp":         55,
 		"damage":     20,
@@ -63,11 +64,12 @@ const MONSTER_DEFS = {
 			"main": Color(0.18, 0.30, 0.78),
 			"dark": Color(0.15, 0.25, 0.70),
 			"nose": Color(0.12, 0.22, 0.60),
+			"eye":  Color(0.90, 0.90, 0.10),
 		},
 	},
 	"r": {
 		"name":       "Gobelin rouge",
-		"scene":      "res://scenes/monster_red.tscn",
+		"scene":      "res://scenes/monster_base.tscn",
 		"behavior":   "standard",
 		"hp":         90,
 		"damage":     30,
@@ -78,6 +80,7 @@ const MONSTER_DEFS = {
 			"main": Color(0.80, 0.12, 0.08),
 			"dark": Color(0.72, 0.10, 0.08),
 			"nose": Color(0.60, 0.08, 0.06),
+			"eye":  Color(1.00, 0.55, 0.05),
 		},
 	},
 }

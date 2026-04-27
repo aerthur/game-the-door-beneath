@@ -9,13 +9,8 @@ extends Node2D
 var monsters_node : Node2D
 var grid          : Array   # référence partagée avec game.gd
 
-# Registre des scènes indexé par monster_id (data-driven)
-var MONSTER_SCENES : Dictionary = {
-	"g": preload("res://scenes/monster_blob.tscn"),
-	"b": preload("res://scenes/monster_blue.tscn"),
-	"r": preload("res://scenes/monster_red.tscn"),
-}
-var boss_scene = preload("res://scenes/monster_boss.tscn")
+var monster_base_scene = preload("res://scenes/monster_base.tscn")
+var boss_scene         = preload("res://scenes/monster_boss.tscn")
 
 # ── Helper position grille ───────────────────────────────────────
 func grid_pos(row: int, lane: int) -> Vector2:
@@ -117,8 +112,7 @@ func spawn_monster(monster_id: String, spawn_ctx: Dictionary) -> bool:
 		r += 1
 	if r >= BoardGeometry.GRID_ROWS: return false
 
-	var scene = MONSTER_SCENES.get(monster_id, MONSTER_SCENES["g"])
-	var m = scene.instantiate()
+	var m = monster_base_scene.instantiate()
 	m.setup_from_def(monster_id, def)
 	monsters_node.add_child(m)
 	m.position           = grid_pos(r, target_lane)
