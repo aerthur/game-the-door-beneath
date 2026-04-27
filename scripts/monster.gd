@@ -31,12 +31,14 @@ func tick_freeze() -> void:
 			modulate = Color.WHITE
 
 func setup_from_def(monster_id: String, def: Dictionary) -> void:
-	monster_type = monster_id
+	# monster_type peut être surchargé dans la def (ex: boss_g → "g")
+	monster_type = def.get("monster_type", monster_id)
 	hp           = def["hp"]
 	hp_max       = def["hp"]
 	damage       = def["damage"]
 	move_speed   = def["move_speed"]
 	xp_value     = def["xp_value"]
+	is_boss      = def.get("is_boss", false)
 	if def.has("palette"):
 		apply_palette(def["palette"])
 
