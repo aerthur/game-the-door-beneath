@@ -37,6 +37,25 @@ func setup_from_def(monster_id: String, def: Dictionary) -> void:
 	damage       = def["damage"]
 	move_speed   = def["move_speed"]
 	xp_value     = def["xp_value"]
+	if def.has("palette"):
+		apply_palette(def["palette"])
+
+func apply_palette(palette: Dictionary) -> void:
+	var main_c = palette.get("main", Color.WHITE)
+	var dark_c = palette.get("dark", Color.WHITE)
+	var nose_c = palette.get("nose", Color.WHITE)
+	var eye_c  = palette.get("eye",  Color(0.85, 0.70, 0.05))
+	for node_name in ["Head", "EarLeft", "EarRight"]:
+		var n = get_node_or_null(node_name)
+		if n: n.color = main_c
+	for node_name in ["Body", "ArmLeft", "ArmRight"]:
+		var n = get_node_or_null(node_name)
+		if n: n.color = dark_c
+	var nose_n = get_node_or_null("Nose")
+	if nose_n: nose_n.color = nose_c
+	for node_name in ["EyeLeft", "EyeRight"]:
+		var n = get_node_or_null(node_name)
+		if n: n.color = eye_c
 
 func _on_damage_taken() -> void:
 	pass
