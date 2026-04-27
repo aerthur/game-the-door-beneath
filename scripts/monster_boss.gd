@@ -3,38 +3,16 @@ extends Monster
 var health_bar : ProgressBar
 
 func _ready() -> void:
-	is_boss = true
-	_apply_type_color()
 	_create_health_bar()
 	_create_crown()
 
+func setup_from_def(monster_id: String, def: Dictionary) -> void:
+	super.setup_from_def(monster_id, def)
+	# is_boss est déjà positionné par Monster.setup_from_def via def["is_boss"]
+	# apply_palette est appelé par super et couvre tous les nœuds partagés
+
 func _on_damage_taken() -> void:
 	update_health_bar()
-
-func _apply_type_color():
-	var main_col : Color
-	var dark_col : Color
-	var nose_col : Color
-	match monster_type:
-		"g":
-			main_col = Color(0.25, 0.52, 0.14, 1)
-			dark_col = Color(0.22, 0.48, 0.12, 1)
-			nose_col = Color(0.18, 0.40, 0.10, 1)
-		"b":
-			main_col = Color(0.22, 0.35, 0.75, 1)
-			dark_col = Color(0.18, 0.30, 0.68, 1)
-			nose_col = Color(0.15, 0.25, 0.60, 1)
-		"r":
-			main_col = Color(0.75, 0.18, 0.12, 1)
-			dark_col = Color(0.68, 0.15, 0.10, 1)
-			nose_col = Color(0.58, 0.12, 0.08, 1)
-	$Head.color    = main_col
-	$EarLeft.color = main_col
-	$EarRight.color = main_col
-	$Body.color    = dark_col
-	$ArmLeft.color = dark_col
-	$ArmRight.color = dark_col
-	$Nose.color    = nose_col
 
 func _create_health_bar():
 	health_bar = ProgressBar.new()
@@ -56,7 +34,7 @@ func _create_health_bar():
 	health_bar.add_theme_stylebox_override("fill", fill_style)
 
 	var bg_style = StyleBoxFlat.new()
-	bg_style.bg_color          = Color(0.12, 0.10, 0.08, 0.90)
+	bg_style.bg_color            = Color(0.12, 0.10, 0.08, 0.90)
 	bg_style.border_width_left   = 2
 	bg_style.border_width_right  = 2
 	bg_style.border_width_top    = 2

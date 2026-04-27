@@ -30,44 +30,32 @@ func get_composition(room: int) -> Array:
 # ── Boss ─────────────────────────────────────────────────────────
 # Retourne le nombre de boss spawné (toujours 1, pour monsters_remaining)
 func spawn_boss(room_num: int) -> int:
-	var boss_type  : String = "g"
-	var boss_hp    : int    = 300
-	var boss_dmg   : int    = 25
-	var boss_speed : int    = 1
-	var boss_xp    : int    = 500
-
+	var boss_id : String
 	if room_num >= 15:
-		boss_type  = "r"
-		boss_hp    = 1000
-		boss_dmg   = 60
-		boss_speed = 2
-		boss_xp    = 2000
-		if room_num > 15:
-			var extra_tranches = (room_num - 15) / 5
-			var mult = pow(1.5, extra_tranches)
-			boss_hp  = int(boss_hp  * mult)
-			boss_dmg = int(boss_dmg * mult)
-			boss_xp  = int(boss_xp  * mult)
+		boss_id = "boss_r"
 	elif room_num >= 10:
-		boss_type  = "b"
-		boss_hp    = 600
-		boss_dmg   = 40
-		boss_speed = 1
-		boss_xp    = 1000
+		boss_id = "boss_b"
+	else:
+		boss_id = "boss_g"
+
+	var def = GameData.MONSTER_DEFS[boss_id].duplicate()
+
+	# Scaling exponentiel pour les salles au-delà de la salle 15
+	if room_num > 15:
+		var extra_tranches = (room_num - 15) / 5
+		var mult = pow(1.5, extra_tranches)
+		def["hp"]       = int(def["hp"]       * mult)
+		def["damage"]   = int(def["damage"]   * mult)
+		def["xp_value"] = int(def["xp_value"] * mult)
 
 	var boss = boss_scene.instantiate()
-	boss.hp           = boss_hp
-	boss.hp_max       = boss_hp
-	boss.damage       = boss_dmg
-	boss.move_speed   = boss_speed
-	boss.xp_value     = boss_xp
-	boss.monster_type = boss_type
+	boss.setup_from_def(boss_id, def)
 	monsters_node.add_child(boss)
 	boss.position  = grid_pos(0, 2)
 	boss.grid_row  = 0
 	boss.grid_lane = 2
 	grid[0][2]     = boss
-	print("[BOSS] Salle %d — type=%s hp=%d dmg=%d" % [room_num, boss_type, boss_hp, boss_dmg])
+	print("[BOSS] Salle %d — %s hp=%d dmg=%d" % [room_num, def["name"], def["hp"], def["damage"]])
 	return 1
 
 # ── Résolution du contexte de spawn ─────────────────────────────

@@ -83,6 +83,59 @@ const MONSTER_DEFS = {
 			"eye":  Color(1.00, 0.55, 0.05),
 		},
 	},
+	# ── Boss (monster_type = type de base pour couleur/records) ─────
+	# Les stats des salles >15 sont scalées à l'instantiation dans game_enemies.gd
+	"boss_g": {
+		"name":         "Boss Gobelin vert",
+		"scene":        "res://scenes/monster_boss.tscn",
+		"behavior":     "boss",
+		"hp":           300,
+		"damage":       25,
+		"move_speed":   1,
+		"xp_value":     500,
+		"is_boss":      true,
+		"monster_type": "g",
+		"palette": {
+			"main": Color(0.25, 0.52, 0.14),
+			"dark": Color(0.22, 0.48, 0.12),
+			"nose": Color(0.18, 0.40, 0.10),
+			"eye":  Color(0.85, 0.70, 0.05),
+		},
+	},
+	"boss_b": {
+		"name":         "Boss Gobelin bleu",
+		"scene":        "res://scenes/monster_boss.tscn",
+		"behavior":     "boss",
+		"hp":           600,
+		"damage":       40,
+		"move_speed":   1,
+		"xp_value":     1000,
+		"is_boss":      true,
+		"monster_type": "b",
+		"palette": {
+			"main": Color(0.22, 0.35, 0.75),
+			"dark": Color(0.18, 0.30, 0.68),
+			"nose": Color(0.15, 0.25, 0.60),
+			"eye":  Color(0.90, 0.90, 0.10),
+		},
+	},
+	"boss_r": {
+		"name":         "Boss Gobelin rouge",
+		"scene":        "res://scenes/monster_boss.tscn",
+		"behavior":     "boss",
+		"hp":           1000,
+		"damage":       60,
+		"move_speed":   2,
+		"xp_value":     2000,
+		"is_boss":      true,
+		"monster_type": "r",
+		"palette": {
+			"main": Color(0.75, 0.18, 0.12),
+			"dark": Color(0.68, 0.15, 0.10),
+			"nose": Color(0.58, 0.12, 0.08),
+			"eye":  Color(1.00, 0.55, 0.05),
+		},
+	},
 }
 
 # ── Définitions des armes ────────────────────────────────────────
