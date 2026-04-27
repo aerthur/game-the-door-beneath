@@ -9,9 +9,12 @@ extends Node2D
 var monsters_node : Node2D
 var grid          : Array   # référence partagée avec game.gd
 
-var blob_scene = preload("res://scenes/monster_blob.tscn")
-var blue_scene = preload("res://scenes/monster_blue.tscn")
-var red_scene  = preload("res://scenes/monster_red.tscn")
+# Registre des scènes indexé par monster_id (data-driven)
+var MONSTER_SCENES : Dictionary = {
+	"g": preload("res://scenes/monster_blob.tscn"),
+	"b": preload("res://scenes/monster_blue.tscn"),
+	"r": preload("res://scenes/monster_red.tscn"),
+}
 var boss_scene = preload("res://scenes/monster_boss.tscn")
 
 # ── Helper position grille ───────────────────────────────────────
@@ -72,31 +75,55 @@ func spawn_boss(room_num: int) -> int:
 	print("[BOSS] Salle %d — type=%s hp=%d dmg=%d" % [room_num, boss_type, boss_hp, boss_dmg])
 	return 1
 
+# ── Résolution du contexte de spawn ─────────────────────────────
+# spawn_ctx = { "entry_side": String, "entry_index": int }
+# entry_side  : "top" | "bottom" | "left" | "right"
+# entry_index : numéro de lane (top/bottom) ou de rangée (left/right)
+# Retourne { "row": int, "lane": int } en coordonnées grille.
+func _resolve_spawn_ctx(ctx: Dictionary) -> Dictionary:
+	var side  : String = ctx.get("entry_side",  "top")
+	var index : int    = ctx.get("entry_index", 0)
+	match side:
+		"bottom": return { "row": BoardGeometry.GRID_ROWS - 1, "lane": index }
+		"left":   return { "row": index, "lane": 0 }
+		"right":  return { "row": index, "lane": BoardGeometry.GRID_COLUMNS - 1 }
+		_:        return { "row": 0, "lane": index }  # "top" par défaut
+
 # ── Vague de monstres ────────────────────────────────────────────
 func spawn_wave(composition: Array):
 	var lanes_list = range(BoardGeometry.GRID_COLUMNS)
 	lanes_list.shuffle()
 	for i in composition.size():
 		var lane = lanes_list[i % BoardGeometry.GRID_COLUMNS]
-		spawn_monster(0, lane, composition[i])
+		var ctx  = { "entry_side": "top", "entry_index": lane }
+		spawn_monster(composition[i], ctx)
 
-func spawn_monster(row: int, lane: int, type: String) -> bool:
-	var target_lane = find_spawn_lane(lane)
+# spawn_monster — data-driven et contextuel
+# monster_id : clé dans GameData.MONSTER_DEFS
+# spawn_ctx  : { "entry_side": String, "entry_index": int }
+func spawn_monster(monster_id: String, spawn_ctx: Dictionary) -> bool:
+	if not GameData.MONSTER_DEFS.has(monster_id):
+		push_error("[Enemies] monster_id inconnu : " + monster_id)
+		return false
+
+	var def      : Dictionary = GameData.MONSTER_DEFS[monster_id]
+	var resolved : Dictionary = _resolve_spawn_ctx(spawn_ctx)
+
+	var target_lane = find_spawn_lane(resolved["lane"])
 	if target_lane == -1: return false   # toutes colonnes pleines
 
-	var r = row
+	var r : int = resolved["row"]
 	while r < BoardGeometry.GRID_ROWS and grid[r][target_lane] != null:
 		r += 1
 	if r >= BoardGeometry.GRID_ROWS: return false
 
-	var scene = blob_scene
-	if   type == "b": scene = blue_scene
-	elif type == "r": scene = red_scene
+	var scene = MONSTER_SCENES.get(monster_id, MONSTER_SCENES["g"])
 	var m = scene.instantiate()
+	m.setup_from_def(monster_id, def)
 	monsters_node.add_child(m)
-	m.position          = grid_pos(r, target_lane)
-	m.grid_row          = r
-	m.grid_lane         = target_lane
+	m.position           = grid_pos(r, target_lane)
+	m.grid_row           = r
+	m.grid_lane          = target_lane
 	grid[r][target_lane] = m
 	return true
 
