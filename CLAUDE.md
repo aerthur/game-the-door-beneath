@@ -79,6 +79,7 @@ records_ctrl.hud = hud
 `game_constants.gd` déclare `class_name GameData`. Accessible via `GameData.X` depuis n'importe quel script :
 
 ```gdscript
+GameData.TICKS_PER_SECOND  # 12 — cadence fixe de la simulation
 GameData.ROOM_WAVES    # Dict salle → liste types monstres
 GameData.WEAPON_DEFS   # Dict id → {name, base_dmg, cd, desc, icon}
 GameData.MONSTER_DEFS  # Dict id → def complète (hp, damage, scene, palette, …)
@@ -86,6 +87,47 @@ GameData.LORE_TEXTS    # Dict salle → texte lore (salles 1–15)
 ```
 
 > ⚠️ Les constantes de géométrie (`LANES`, `ROWS`, `LANE_W`, etc.) ont été **migrées dans `BoardGeometry`**. Ne plus les chercher dans `GameData`.
+
+### Système de tick — simulation fixe à 12 tps (issue #68)
+
+La simulation s'exécute à **12 ticks par seconde** (cadence fixe). Toutes les mécaniques temporelles (déplacement, statuts) s'expriment en **ticks**, pas en secondes.
+
+**Cadence et conversions :**
+
+| Durée | Ticks |
+|---|---|
+| 1 tick ≈ 83 ms | 1 |
+| 0,25 s | 3 |
+| 0,5 s | 6 |
+| 1 s | 12 |
+| 2 s | 24 |
+
+`GameData.TICKS_PER_SECOND = 12` est la constante de référence.
+
+**Boucle dans `game.gd._process()`** : accumulation du delta dans `tick_acc`, puis boucle `while` qui décrémente `tick_acc -= tick_interval` et appelle `_do_tick()`. Plusieurs ticks peuvent s'exécuter par frame pour rattraper le temps réel.
+
+**Déplacement des monstres :**
+
+Chaque `Monster` porte deux champs :
+- `move_period_ticks` — nombre de ticks entre deux déplacements (calculé depuis `move_speed` via `TICKS_PER_SECOND / move_speed`)
+- `move_countdown_ticks` — décompte décrémenté à chaque tick ; quand il atteint 0, le monstre se déplace et le compteur se recharge à `move_period_ticks`
+
+| `move_speed` | `move_period_ticks` | Rythme effectif |
+|---|---|---|
+| 1 | 12 | 1 case/s |
+| 2 | 6 | 2 cases/s |
+
+**Gel (freeze) :**
+
+`frozen_ticks` exprime le gel en ticks (12 ticks = 1 s). `tick_freeze()` est appelé à **chaque tick** (pas seulement sur tentative de déplacement). Exemple : givre → `freeze(24)` = 2 s.
+
+**Règles de priorité :**
+- `tick_freeze()` est appelé en premier ; si gelé, le monstre ne bouge pas et `move_countdown_ticks` n'est pas décrémenté.
+- L'itération se fait du bas vers le haut (`GRID_ROWS-1` → `0`) pour éviter qu'un monstre qui vient de descendre soit traité deux fois dans le même tick.
+
+**Points d'extension :**
+
+Pour ajouter une nouvelle vitesse (ex. `move_speed = 3` → `move_period_ticks = 4`), il suffit d'ajouter l'entrée dans `MONSTER_DEFS` ; la conversion est automatique dans `Monster.setup_from_def()`. Les futurs cooldowns d'actions, délais de comportement ou durées de statuts doivent tous s'exprimer en ticks en utilisant `GameData.TICKS_PER_SECOND` comme référence.
 
 ### BoardState — occupation de la grille
 
