@@ -31,6 +31,7 @@ game-the-door-beneath/
     ├── game.gd                 ← coordinateur principal (état, tick, room)
     ├── game_constants.gd       ← class_name GameData (ROOM_WAVES, WEAPON_DEFS, MONSTER_DEFS, LORE_TEXTS)
     ├── board_geometry.gd       ← class_name BoardGeometry (géométrie grille 5×8, helpers statiques)
+    ├── board_state.gd          ← class_name BoardState (occupation de la grille, source de vérité)
     ├── monster.gd              ← class_name Monster (classe de base de tous les monstres)
     ├── game_enemies.gd         ← spawn, placement, retraite des ennemis ($Enemies)
     ├── game_player.gd          ← état/input joueur ($PlayerCtrl)
@@ -64,8 +65,8 @@ game-the-door-beneath/
 
 Dans `_ready()`, game.gd passe ses références aux sous-systèmes :
 ```gdscript
-enemies.grid = grid
-weapons.grid = grid
+enemies.board_state = board_state
+weapons.board_state = board_state
 weapons.visuals = visuals
 weapons.deal_fn = _deal_and_check
 player_ctrl.weapons_ref = weapons
@@ -84,6 +85,25 @@ GameData.LORE_TEXTS    # Dict salle → texte lore (salles 1–15)
 ```
 
 > ⚠️ Les constantes de géométrie (`LANES`, `ROWS`, `LANE_W`, etc.) ont été **migrées dans `BoardGeometry`**. Ne plus les chercher dans `GameData`.
+
+### BoardState — occupation de la grille
+
+`board_state.gd` déclare `class_name BoardState` (extends RefCounted). Source de vérité unique pour l'occupation des cellules 5×8. Instanciée dans `game.gd` et partagée avec `game_enemies.gd` et `game_weapons.gd` via `board_state`.
+
+Un seul occupant principal par cellule dans les usages actuels (Node2D ou null). Conçu pour ne pas bloquer une évolution vers plusieurs entités par cellule.
+
+```gdscript
+board_state.clear_all()                          # réinitialise toute la grille (null)
+board_state.is_cell_free(row, col) -> bool
+board_state.is_cell_occupied(row, col) -> bool
+board_state.set_cell_occupied(row, col, occupant)
+board_state.clear_cell(row, col)
+board_state.get_cell_occupant(row, col)          # retourne Node2D ou null
+board_state.is_grid_empty() -> bool
+```
+
+> Toute modification d'occupation (spawn, déplacement, mort, retraite boss) doit passer par `board_state`. Ne jamais modifier directement l'état interne `_cells`.
+> Toujours mettre à jour `board_state` ET `m.grid_row` / `m.grid_lane` ensemble lors d'un déplacement.
 
 ### BoardGeometry — géométrie de la grille
 
@@ -137,8 +157,8 @@ var spawns_in_flight   : int   # coroutines _on_monster_escaped en cours
 var room_clear         : bool
 var game_over          : bool
 var leveling_up        : bool
-var active_weapons     : Array # [{"id": "arc", "level": 1, "acc": 0.0}, ...]
-var grid               : Array # grid[row][lane] = monstre Node2D ou null
+var active_weapons     : Array      # [{"id": "arc", "level": 1, "acc": 0.0}, ...]
+var board_state        : BoardState # source de vérité pour l'occupation de la grille
 ```
 
 ### Fonctions importantes (game.gd)
@@ -156,10 +176,10 @@ var grid               : Array # grid[row][lane] = monstre Node2D ou null
 
 ### Grille
 
-`grid[row][lane]` contient le Node2D du monstre ou `null`.
+L'occupation de la grille est gérée exclusivement par `board_state` (instance de `BoardState`).
 - row 0 = haut de l'écran, row 7 = bas
 - lane 0 = gauche, lane 4 = droite
-- Toujours mettre à jour `grid[row][lane]` ET `m.grid_row` / `m.grid_lane` ensemble
+- Toujours appeler `board_state.set_cell_occupied/clear_cell` ET mettre à jour `m.grid_row` / `m.grid_lane` ensemble
 
 ### Room clear (important — bug précédemment corrigé)
 

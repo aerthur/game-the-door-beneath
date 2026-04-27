@@ -4,10 +4,10 @@ extends Node2D
 # Doit être ajouté comme enfant du nœud Game dans main.tscn.
 # game.gd définit dans _ready() :
 #   enemies.monsters_node = monsters_node
-#   enemies.grid          = grid          ← même référence Array
+#   enemies.board_state   = board_state   ← source de vérité partagée
 
 var monsters_node : Node2D
-var grid          : Array   # référence partagée avec game.gd
+var board_state   : BoardState  # source de vérité partagée avec game.gd
 
 var _scene_cache  : Dictionary = {}  # scene_path → PackedScene
 
@@ -58,7 +58,7 @@ func spawn_boss(room_num: int) -> int:
 	boss.position  = grid_pos(0, 2)
 	boss.grid_row  = 0
 	boss.grid_lane = 2
-	grid[0][2]     = boss
+	board_state.set_cell_occupied(0, 2, boss)
 	print("[BOSS] Salle %d — %s hp=%d dmg=%d" % [room_num, def["name"], def["hp"], def["damage"]])
 	return 1
 
@@ -100,25 +100,25 @@ func spawn_monster(monster_id: String, spawn_ctx: Dictionary) -> bool:
 	if target_lane == -1: return false   # toutes colonnes pleines
 
 	var r : int = resolved["row"]
-	while r < BoardGeometry.GRID_ROWS and grid[r][target_lane] != null:
+	while r < BoardGeometry.GRID_ROWS and board_state.is_cell_occupied(r, target_lane):
 		r += 1
 	if r >= BoardGeometry.GRID_ROWS: return false
 
 	var m = _get_scene(def["scene"]).instantiate()
 	m.setup_from_def(monster_id, def)
 	monsters_node.add_child(m)
-	m.position           = grid_pos(r, target_lane)
-	m.grid_row           = r
-	m.grid_lane          = target_lane
-	grid[r][target_lane] = m
+	m.position  = grid_pos(r, target_lane)
+	m.grid_row  = r
+	m.grid_lane = target_lane
+	board_state.set_cell_occupied(r, target_lane, m)
 	return true
 
 func find_spawn_lane(preferred: int) -> int:
-	if grid[0][preferred] == null:
+	if board_state.is_cell_free(0, preferred):
 		return preferred
 	for offset in [1, -1, 2, -2, 3, -3, 4, -4]:
 		var l = preferred + offset
-		if l >= 0 and l < BoardGeometry.GRID_COLUMNS and grid[0][l] == null:
+		if l >= 0 and l < BoardGeometry.GRID_COLUMNS and board_state.is_cell_free(0, l):
 			return l
 	return -1
 
@@ -129,6 +129,6 @@ func boss_retreat(boss: Node2D, lane: int):
 	boss.update_health_bar()
 	boss.grid_row  = 0
 	boss.grid_lane = lane
-	grid[0][lane]  = boss
+	board_state.set_cell_occupied(0, lane, boss)
 	boss.position  = grid_pos(0, lane)
 	print("[BOSS] Remontée file %d — soigné +%d → %d/%d" % [lane + 1, heal_amount, boss.hp, boss.hp_max])
