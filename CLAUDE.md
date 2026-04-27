@@ -27,6 +27,7 @@ game-the-door-beneath/
 │   └── ui/
 │       └── hud.tscn            ← CanvasLayer UI (HP, XP, armes, level-up, game over)
 └── scripts/
+    ├── obstacle_data.gd        ← class_name ObstacleData (structure de données obstacles)
     ├── title_screen.gd         ← menu principal + affichage meilleurs scores
     ├── game.gd                 ← coordinateur principal (état, tick, room)
     ├── game_constants.gd       ← class_name GameData (ROOM_WAVES, WEAPON_DEFS, MONSTER_DEFS, LORE_TEXTS)
@@ -90,20 +91,47 @@ GameData.LORE_TEXTS    # Dict salle → texte lore (salles 1–15)
 
 `board_state.gd` déclare `class_name BoardState` (extends RefCounted). Source de vérité unique pour l'occupation des cellules 5×8. Instanciée dans `game.gd` et partagée avec `game_enemies.gd` et `game_weapons.gd` via `board_state`.
 
-Un seul occupant principal par cellule dans les usages actuels (Node2D ou null). Conçu pour ne pas bloquer une évolution vers plusieurs entités par cellule.
+Deux couches indépendantes : occupants (`_cells`) et obstacles (`_obstacles`). Un seul occupant principal par cellule (Node2D ou null).
 
 ```gdscript
-board_state.clear_all()                          # réinitialise toute la grille (null)
+# Occupants
+board_state.clear_all()                          # réinitialise occupants ET obstacles
 board_state.is_cell_free(row, col) -> bool
 board_state.is_cell_occupied(row, col) -> bool
 board_state.set_cell_occupied(row, col, occupant)
 board_state.clear_cell(row, col)
 board_state.get_cell_occupant(row, col)          # retourne Node2D ou null
 board_state.is_grid_empty() -> bool
+
+# Obstacles
+board_state.has_obstacle(row, col) -> bool
+board_state.get_obstacle(row, col) -> ObstacleData
+board_state.set_obstacle(row, col, obstacle_data)
+board_state.clear_obstacle(row, col)
+board_state.clear_obstacles()
+board_state.is_cell_blocked(row, col) -> bool    # true si obstacle bloque mouvement/occupation
 ```
 
-> Toute modification d'occupation (spawn, déplacement, mort, retraite boss) doit passer par `board_state`. Ne jamais modifier directement l'état interne `_cells`.
+> Toute modification d'occupation (spawn, déplacement, mort, retraite boss) doit passer par `board_state`. Ne jamais modifier directement `_cells` ou `_obstacles`.
 > Toujours mettre à jour `board_state` ET `m.grid_row` / `m.grid_lane` ensemble lors d'un déplacement.
+> Le code de déplacement (`_do_tick`) et de spawn (`game_enemies`) vérifie `is_cell_blocked()` en plus de `is_cell_free()`.
+
+### ObstacleData — structure de données d'obstacle
+
+`obstacle_data.gd` déclare `class_name ObstacleData` (extends RefCounted). Décrit un obstacle sur une cellule. Conçu pour distinguer plusieurs familles sans se limiter à un booléen.
+
+| Champ | Type | Valeur par défaut | Rôle |
+|---|---|---|---|
+| `kind` | String | `"wall"` | Identifiant sémantique de l'obstacle |
+| `blocks_movement` | bool | `true` | Empêche un monstre de traverser la cellule |
+| `blocks_occupancy` | bool | `true` | Empêche tout spawn/placement sur la cellule |
+| `blocks_los` | bool | `false` | Bloque la ligne de vue (non exploité pour le moment) |
+| `destructibility` | String | `"indestructible"` | `"indestructible"` ou `"destructible"` |
+| `hp` / `max_hp` | int | `-1` | Points de vie si destructible (-1 = non applicable) |
+
+Factory disponible : `ObstacleData.make_wall()` → mur indestructible bloquant tout.
+
+**Obstacles de test** : `game.gd._setup_test_obstacles()` place deux murs en (row=3, col=1) et (row=3, col=3). Rendu visuel dans `_draw_obstacles()` (overlay ColorRect sur le `$Background`).
 
 ### BoardGeometry — géométrie de la grille
 

@@ -3,16 +3,22 @@ extends RefCounted
 # Source de vérité unique pour l'occupation de la grille 5×8.
 # Un seul occupant principal par cellule (Node2D ou null).
 # Conçu pour ne pas bloquer une évolution future vers plusieurs entités par cellule.
+# Couche obstacles séparée : chaque cellule peut contenir un ObstacleData ou null.
 
-var _cells: Array = []
+var _cells:     Array = []
+var _obstacles: Array = []
 
 func clear_all() -> void:
 	_cells.clear()
+	_obstacles.clear()
 	for _r in BoardGeometry.GRID_ROWS:
-		var row = []
+		var row_cells = []
+		var row_obs   = []
 		for _l in BoardGeometry.GRID_COLUMNS:
-			row.append(null)
-		_cells.append(row)
+			row_cells.append(null)
+			row_obs.append(null)
+		_cells.append(row_cells)
+		_obstacles.append(row_obs)
 
 func is_cell_free(row: int, col: int) -> bool:
 	return _cells[row][col] == null
@@ -35,3 +41,28 @@ func is_grid_empty() -> bool:
 			if _cells[r][l] != null:
 				return false
 	return true
+
+# ── API Obstacles ────────────────────────────────────────────────────
+func has_obstacle(row: int, col: int) -> bool:
+	return _obstacles[row][col] != null
+
+func get_obstacle(row: int, col: int) -> ObstacleData:
+	return _obstacles[row][col]
+
+func set_obstacle(row: int, col: int, obstacle_data: ObstacleData) -> void:
+	_obstacles[row][col] = obstacle_data
+
+func clear_obstacle(row: int, col: int) -> void:
+	_obstacles[row][col] = null
+
+func clear_obstacles() -> void:
+	for r in BoardGeometry.GRID_ROWS:
+		for l in BoardGeometry.GRID_COLUMNS:
+			_obstacles[r][l] = null
+
+# Retourne true si la cellule porte un obstacle bloquant le mouvement/l'occupation.
+func is_cell_blocked(row: int, col: int) -> bool:
+	var obs: ObstacleData = _obstacles[row][col]
+	if obs == null:
+		return false
+	return obs.blocks_movement or obs.blocks_occupancy
