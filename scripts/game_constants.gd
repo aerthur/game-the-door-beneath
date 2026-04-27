@@ -33,6 +33,55 @@ const LORE_TEXTS = {
 	15: "Ce gardien rouge... ses yeux étaient intelligents. Il savait qui j'étais. Comment est-ce possible ?",
 }
 
+# ── Définitions des ennemis standards ───────────────────────────
+const MONSTER_DEFS = {
+	"g": {
+		"name":       "Gobelin vert",
+		"scene":      "res://scenes/monster_blob.tscn",
+		"behavior":   "standard",
+		"hp":         30,
+		"damage":     12,
+		"move_speed": 1,
+		"xp_value":   25,
+		"is_boss":    false,
+		"palette": {
+			"main": Color(0.25, 0.52, 0.14),
+			"dark": Color(0.22, 0.48, 0.12),
+			"nose": Color(0.18, 0.40, 0.10),
+		},
+	},
+	"b": {
+		"name":       "Gobelin bleu",
+		"scene":      "res://scenes/monster_blue.tscn",
+		"behavior":   "standard",
+		"hp":         55,
+		"damage":     20,
+		"move_speed": 1,
+		"xp_value":   50,
+		"is_boss":    false,
+		"palette": {
+			"main": Color(0.18, 0.30, 0.78),
+			"dark": Color(0.15, 0.25, 0.70),
+			"nose": Color(0.12, 0.22, 0.60),
+		},
+	},
+	"r": {
+		"name":       "Gobelin rouge",
+		"scene":      "res://scenes/monster_red.tscn",
+		"behavior":   "standard",
+		"hp":         90,
+		"damage":     30,
+		"move_speed": 2,
+		"xp_value":   100,
+		"is_boss":    false,
+		"palette": {
+			"main": Color(0.80, 0.12, 0.08),
+			"dark": Color(0.72, 0.10, 0.08),
+			"nose": Color(0.60, 0.08, 0.06),
+		},
+	},
+}
+
 # ── Définitions des armes ────────────────────────────────────────
 const WEAPON_DEFS = {
 	"arc":        {"name": "Arc",        "base_dmg": 25, "cd": 1.0,  "desc": "1 ennemi dans la file active",       "icon": "🏹", "icon_path": ""},
