@@ -24,7 +24,7 @@ func get_composition(room: int) -> Array:
 		return GameData.ROOM_WAVES[room].duplicate()
 	# Au-delà de la salle 10 : que des rouges, de plus en plus
 	var extra = room - 10
-	var reds  = min(GameData.LANES + extra, GameData.LANES * 2)
+	var reds  = min(BoardGeometry.GRID_COLUMNS + extra, BoardGeometry.GRID_COLUMNS * 2)
 	var result = []
 	for _i in reds: result.append("r")
 	return result
@@ -74,10 +74,10 @@ func spawn_boss(room_num: int) -> int:
 
 # ── Vague de monstres ────────────────────────────────────────────
 func spawn_wave(composition: Array):
-	var lanes_list = range(GameData.LANES)
+	var lanes_list = range(BoardGeometry.GRID_COLUMNS)
 	lanes_list.shuffle()
 	for i in composition.size():
-		var lane = lanes_list[i % GameData.LANES]
+		var lane = lanes_list[i % BoardGeometry.GRID_COLUMNS]
 		spawn_monster(0, lane, composition[i])
 
 func spawn_monster(row: int, lane: int, type: String) -> bool:
@@ -85,9 +85,9 @@ func spawn_monster(row: int, lane: int, type: String) -> bool:
 	if target_lane == -1: return false   # toutes colonnes pleines
 
 	var r = row
-	while r < GameData.ROWS and grid[r][target_lane] != null:
+	while r < BoardGeometry.GRID_ROWS and grid[r][target_lane] != null:
 		r += 1
-	if r >= GameData.ROWS: return false
+	if r >= BoardGeometry.GRID_ROWS: return false
 
 	var scene = blob_scene
 	if   type == "b": scene = blue_scene
@@ -105,7 +105,7 @@ func find_spawn_lane(preferred: int) -> int:
 		return preferred
 	for offset in [1, -1, 2, -2, 3, -3, 4, -4]:
 		var l = preferred + offset
-		if l >= 0 and l < GameData.LANES and grid[0][l] == null:
+		if l >= 0 and l < BoardGeometry.GRID_COLUMNS and grid[0][l] == null:
 			return l
 	return -1
 

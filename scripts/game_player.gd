@@ -34,7 +34,7 @@ func init_player(lane: int, hp: int, hp_max: int):
 
 # ── Déplacement ──────────────────────────────────────────────────
 func move(dir: int):
-	player_lane = clamp(player_lane + dir, 0, GameData.LANES - 1)
+	player_lane = clamp(player_lane + dir, 0, BoardGeometry.GRID_COLUMNS - 1)
 	var tw = create_tween()
 	tw.tween_property(player_node, "position",
 		Vector2(BoardGeometry.GRID_ORIGIN_X + player_lane * BoardGeometry.CELL_WIDTH + BoardGeometry.CELL_WIDTH * 0.5,

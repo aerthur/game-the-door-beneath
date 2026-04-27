@@ -32,7 +32,7 @@ func fire(w: Dictionary):
 
 # ── 8 armes ──────────────────────────────────────────────────────
 func _w_arc(w: Dictionary):
-	for r in range(GameData.ROWS - 1, -1, -1):
+	for r in range(BoardGeometry.GRID_ROWS - 1, -1, -1):
 		if grid[r][player_lane] != null:
 			var m = grid[r][player_lane]
 			var t = 0.15 + r * 0.02
@@ -43,7 +43,7 @@ func _w_arc(w: Dictionary):
 
 func _w_arbalete(w: Dictionary):
 	var hit = 0
-	for r in range(GameData.ROWS - 1, -1, -1):
+	for r in range(BoardGeometry.GRID_ROWS - 1, -1, -1):
 		if hit >= 2: break
 		if grid[r][player_lane] != null:
 			var m = grid[r][player_lane]
@@ -53,7 +53,7 @@ func _w_arbalete(w: Dictionary):
 			hit += 1
 
 func _w_dague(w: Dictionary):
-	for r in range(GameData.ROWS - 1, -1, -1):
+	for r in range(BoardGeometry.GRID_ROWS - 1, -1, -1):
 		if grid[r][player_lane] != null:
 			visuals.show_slash(player_lane, r)
 			deal_fn.call(grid[r][player_lane], r, player_lane, get_dmg(w))
@@ -61,8 +61,8 @@ func _w_dague(w: Dictionary):
 
 func _w_bombe(w: Dictionary):
 	for l in [player_lane - 1, player_lane, player_lane + 1]:
-		if l < 0 or l >= GameData.LANES: continue
-		for r in range(GameData.ROWS - 1, -1, -1):
+		if l < 0 or l >= BoardGeometry.GRID_COLUMNS: continue
+		for r in range(BoardGeometry.GRID_ROWS - 1, -1, -1):
 			if grid[r][l] != null:
 				visuals.show_explosion(l, r)
 				await get_tree().create_timer(0.1).timeout
@@ -70,21 +70,21 @@ func _w_bombe(w: Dictionary):
 				break
 
 func _w_eclair(w: Dictionary):
-	for r in range(GameData.ROWS - 1, -1, -1):
+	for r in range(BoardGeometry.GRID_ROWS - 1, -1, -1):
 		if grid[r][player_lane] != null:
 			visuals.show_lightning(player_lane, r)
 			deal_fn.call(grid[r][player_lane], r, player_lane, get_dmg(w))
 
 func _w_tourbillon(w: Dictionary):
 	visuals.show_whirlwind()
-	for l in GameData.LANES:
-		for r in range(GameData.ROWS - 1, -1, -1):
+	for l in BoardGeometry.GRID_COLUMNS:
+		for r in range(BoardGeometry.GRID_ROWS - 1, -1, -1):
 			if grid[r][l] != null:
 				deal_fn.call(grid[r][l], r, l, get_dmg(w))
 				break
 
 func _w_givre(w: Dictionary):
-	for r in range(GameData.ROWS - 1, -1, -1):
+	for r in range(BoardGeometry.GRID_ROWS - 1, -1, -1):
 		if grid[r][player_lane] != null:
 			var m = grid[r][player_lane]
 			visuals.shoot_arrow(player_lane, r, 0.2, Color(0.4, 0.85, 1.0), 3.0)
@@ -96,7 +96,7 @@ func _w_givre(w: Dictionary):
 
 func _w_sismique(w: Dictionary):
 	visuals.show_quake()
-	for r in [GameData.ROWS - 1, GameData.ROWS - 2]:
-		for l in GameData.LANES:
+	for r in [BoardGeometry.GRID_ROWS - 1, BoardGeometry.GRID_ROWS - 2]:
+		for l in BoardGeometry.GRID_COLUMNS:
 			if r >= 0 and grid[r][l] != null:
 				deal_fn.call(grid[r][l], r, l, get_dmg(w))

@@ -41,8 +41,8 @@ func show_slash(lane: int, row: int):
 
 func show_explosion(lane: int, row: int):
 	var exp = ColorRect.new()
-	exp.size = Vector2(GameData.LANE_W - 4, GameData.ROW_H - 4)
-	exp.position = Vector2(GameData.GRID_X + lane * GameData.LANE_W + 2, GameData.GRID_Y + row * GameData.ROW_H + 2)
+	exp.size = Vector2(BoardGeometry.CELL_WIDTH - 4, BoardGeometry.CELL_HEIGHT - 4)
+	exp.position = Vector2(BoardGeometry.GRID_ORIGIN_X + lane * BoardGeometry.CELL_WIDTH + 2, BoardGeometry.GRID_ORIGIN_Y + row * BoardGeometry.CELL_HEIGHT + 2)
 	exp.color = Color(1.0, 0.55, 0.1, 0.70); bg.add_child(exp)
 	await get_tree().create_timer(0.15).timeout
 	if is_instance_valid(exp): exp.queue_free()
@@ -59,16 +59,16 @@ func show_lightning(lane: int, row: int):
 
 func show_whirlwind():
 	var rect = ColorRect.new()
-	rect.size = Vector2(GameData.LANES * GameData.LANE_W, GameData.ROW_H)
-	rect.position = Vector2(GameData.GRID_X, GameData.GRID_Y + (GameData.ROWS - 1) * GameData.ROW_H)
+	rect.size = Vector2(BoardGeometry.GRID_COLUMNS * BoardGeometry.CELL_WIDTH, BoardGeometry.CELL_HEIGHT)
+	rect.position = Vector2(BoardGeometry.GRID_ORIGIN_X, BoardGeometry.GRID_ORIGIN_Y + (BoardGeometry.GRID_ROWS - 1) * BoardGeometry.CELL_HEIGHT)
 	rect.color = Color(0.8, 0.5, 1.0, 0.35); bg.add_child(rect)
 	await get_tree().create_timer(0.18).timeout
 	if is_instance_valid(rect): rect.queue_free()
 
 func show_quake():
 	var rect = ColorRect.new()
-	rect.size = Vector2(GameData.LANES * GameData.LANE_W, GameData.ROW_H * 2)
-	rect.position = Vector2(GameData.GRID_X, GameData.GRID_Y + (GameData.ROWS - 2) * GameData.ROW_H)
+	rect.size = Vector2(BoardGeometry.GRID_COLUMNS * BoardGeometry.CELL_WIDTH, BoardGeometry.CELL_HEIGHT * 2)
+	rect.position = Vector2(BoardGeometry.GRID_ORIGIN_X, BoardGeometry.GRID_ORIGIN_Y + (BoardGeometry.GRID_ROWS - 2) * BoardGeometry.CELL_HEIGHT)
 	rect.color = Color(0.9, 0.65, 0.2, 0.40); bg.add_child(rect)
 	var cam = get_viewport().get_camera_2d()
 	if cam:
