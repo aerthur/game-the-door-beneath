@@ -25,7 +25,11 @@ game-the-door-beneath/
 │   └── gut/                    ← framework de tests GUT v9.6.0 (versionné dans le repo)
 ├── test/
 │   └── unit/                   ← tests unitaires GUT (prefixe test_, suffixe .gd)
-│       └── test_board_geometry.gd  ← template de test (à dupliquer pour nouvelles features)
+│       ├── test_board_geometry.gd  ← template de test (à dupliquer pour nouvelles features)
+│       ├── test_board_state.gd     ← occupation de cellules, obstacles, is_grid_empty
+│       ├── test_obstacle_data.gd   ← factory make_wall, obstacles destructibles, blocage
+│       ├── test_monster_stats.gd   ← constantes GameData, conversion ticks, scaling boss
+│       └── test_spawn_fallback.gd  ← _resolve_spawn_ctx, find_spawn_lane, retry/fallback
 ├── scenes/
 │   ├── title_screen.tscn       ← scène principale au démarrage (menu + meilleurs scores)
 │   ├── main.tscn               ← scène de jeu (lancée depuis title_screen)
@@ -494,7 +498,11 @@ Ce système est conçu pour supporter un futur mode où les ennemis spawneraient
 ```
 test/
 └── unit/                           ← tests unitaires
-    └── test_board_geometry.gd      ← template + premier test
+    ├── test_board_geometry.gd      ← template + géométrie grille (issue #83)
+    ├── test_board_state.gd         ← occupation de cellules, obstacles (issue #84)
+    ├── test_obstacle_data.gd       ← factory, destructibles, blocage (issue #84)
+    ├── test_monster_stats.gd       ← constantes, ticks, scaling boss (issue #84)
+    └── test_spawn_fallback.gd      ← resolve_spawn_ctx, find_spawn_lane (issue #84)
 ```
 
 Prévoir plus tard : `test/integration/` pour les tests de scènes complètes.
@@ -555,3 +563,53 @@ Le code de retour est exploitable : `0` = succès, `1` = au moins un test échou
 | Setup | `func before_each() -> void:` / `func before_all() -> void:` |
 
 **Règle** : toute nouvelle logique gameplay cœur (géométrie, état de grille, calculs de stats) devrait idéalement s'accompagner d'un test GUT dans `res://test/unit/`, en suivant le modèle de `test_board_geometry.gd`.
+
+---
+
+## Pack de tests critiques de non-régression (issue #84)
+
+### Objectif et principe
+
+Ce pack fournit un **filet de sécurité minimal** avant le refacto structurel prévu (issue #82). Il protège les règles gameplay les plus structurantes, stables et exposées au risque de régression. Il ne vise pas une couverture exhaustive.
+
+### Ce que couvre ce pack
+
+| Fichier | Systèmes couverts |
+|---|---|
+| `test_board_state.gd` | Occupation de cellules, obstacles (set/get/clear), `is_grid_empty`, `is_cell_blocked` avec tous les cas de blocage |
+| `test_obstacle_data.gd` | Factory `make_wall()`, propriétés d'un mur indestructible, création et hp d'un obstacle destructible, cas overkill |
+| `test_monster_stats.gd` | `TICKS_PER_SECOND`, conversion `move_speed → move_period_ticks`, intégrité de tous les champs de `MONSTER_DEFS` et `WEAPON_DEFS`, formule de scaling des boss |
+| `test_spawn_fallback.gd` | `_resolve_spawn_ctx` (mapping `entry_side` → coordonnées grille pour top/bottom/left/right), `find_spawn_lane` (lane préférée libre, retry offset +1/-1, fallback, all-occupied, all-blocked, lanes de bord) |
+
+### Ce que ce pack ne couvre pas encore
+
+- **Visuels et animations** : effets d'armes, flèches, explosions (dépendants du rendu)
+- **Logique de tir des armes** (`game_weapons.gd`) : requiert des nodes visuels (`$Background`, `$Visuals`)
+- **Comportement du boss** : retraite, barre de vie (dépend de la scène `monster_boss.tscn`)
+- **Tick complet de simulation** : `game.gd._do_tick()` coordonne trop de sous-systèmes
+- **HUD et records** : dépendent de scènes et de fichiers persistants
+- **Projectile orienté selon le côté actif** : le concept `player_side → forward_dir` n'est pas encore formalisé dans le code (spawner fixé en bas)
+
+### Comment étendre ce pack
+
+Pour de futurs tickets :
+1. **Comportements monstres** (`on_tick()` overrides) → `test_monster_behaviors.gd`
+2. **Scaling des armes** (formule `base_dmg * (1 + (level-1) * 0.5)`) → `test_weapon_scaling.gd`
+3. **Records et persistance** (mock du filesystem) → `test_game_records.gd`
+4. **Spawn contextuel multi-côté** (quand `player_side` sera implémenté) → étendre `test_spawn_fallback.gd`
+5. **Obstacles destructibles en jeu** (intégration `BoardState` + `deal_fn`) → `test/integration/`
+
+### Relancer le pack
+
+Le pack s'intègre sans modification dans l'infrastructure existante :
+
+```bash
+# Tous les tests (pack critique inclus)
+godot --headless --script addons/gut/gut_cmdln.gd -gconfig=.gutconfig.json
+
+# Un fichier précis du pack
+godot --headless --script addons/gut/gut_cmdln.gd \
+  -gtest=res://test/unit/test_spawn_fallback.gd -gexit
+```
+
+Le workflow GitHub Actions (`.github/workflows/gut-tests.yml`) exécute automatiquement l'ensemble sur chaque push et pull_request.
