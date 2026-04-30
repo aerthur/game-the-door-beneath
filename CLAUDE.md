@@ -17,6 +17,15 @@ Scène de démarrage : `title_screen.tscn` → lance `main.tscn` au clic "Nouvel
 game-the-door-beneath/
 ├── project.godot
 ├── CLAUDE.md
+├── .gutconfig.json             ← configuration GUT CLI (dossiers, options)
+├── .github/
+│   └── workflows/
+│       └── gut-tests.yml       ← CI GitHub Actions (GUT sur tous push/PR)
+├── addons/
+│   └── gut/                    ← framework de tests GUT v9.6.0 (versionné dans le repo)
+├── test/
+│   └── unit/                   ← tests unitaires GUT (prefixe test_, suffixe .gd)
+│       └── test_board_geometry.gd  ← template de test (à dupliquer pour nouvelles features)
 ├── scenes/
 │   ├── title_screen.tscn       ← scène principale au démarrage (menu + meilleurs scores)
 │   ├── main.tscn               ← scène de jeu (lancée depuis title_screen)
@@ -464,3 +473,85 @@ Ce système est conçu pour supporter un futur mode où les ennemis spawneraient
 - Visuels → `game_visuals.gd`
 - Records → `game_records.gd`
 - Constantes → `game_constants.gd` (GameData)
+
+### Nouveau test unitaire GUT (issue #83)
+1. Créer `test/unit/test_<nom_module>.gd` (prefixe `test_` obligatoire)
+2. Hériter de `GutTest` : `extends GutTest`
+3. Chaque test = méthode publique `func test_<ce_que_ca_teste>() -> void:`
+4. Utiliser les assertions GUT : `assert_eq`, `assert_true`, `assert_false`, `assert_ne`, etc.
+5. Voir `test/unit/test_board_geometry.gd` comme template de référence
+
+---
+
+## Tests unitaires — GUT (issue #83)
+
+### Framework
+
+**GUT v9.6.0** est intégré dans `addons/gut/` et versionné dans le dépôt (aucun téléchargement nécessaire). Le plugin est activé dans `project.godot`.
+
+### Arborescence
+
+```
+test/
+└── unit/                           ← tests unitaires
+    └── test_board_geometry.gd      ← template + premier test
+```
+
+Prévoir plus tard : `test/integration/` pour les tests de scènes complètes.
+
+### Lancer les tests en ligne de commande
+
+**Tous les tests unitaires :**
+```bash
+godot --headless --script addons/gut/gut_cmdln.gd -gconfig=.gutconfig.json
+```
+
+**Un fichier de test précis :**
+```bash
+godot --headless --script addons/gut/gut_cmdln.gd \
+  -gdir=res://test/unit/ \
+  -ginclude_subdirs \
+  -gtest=res://test/unit/test_board_geometry.gd \
+  -gexit
+```
+
+**Un test ciblé dans un fichier :**
+```bash
+godot --headless --script addons/gut/gut_cmdln.gd \
+  -gdir=res://test/unit/ \
+  -gtest=res://test/unit/test_board_geometry.gd \
+  -gunit_test_name=test_grid_dimensions \
+  -gexit
+```
+
+Le code de retour est exploitable : `0` = succès, `1` = au moins un test échoue.
+
+### Configuration `.gutconfig.json`
+
+```json
+{
+  "dirs": ["res://test/unit/"],
+  "include_subdirs": true,
+  "prefix": "test_",
+  "suffix": ".gd",
+  "log_level": 1,
+  "should_exit": true,
+  "should_exit_on_success": true
+}
+```
+
+### GitHub Actions
+
+`.github/workflows/gut-tests.yml` — déclenché sur **tous les push et pull_request** de toutes les branches. Installe Godot 4.6, puis exécute la commande GUT CLI avec l'addon embarqué (aucun téléchargement de GUT dans le workflow).
+
+### Conventions de nommage
+
+| Élément | Convention |
+|---|---|
+| Fichier de test | `test_<module>.gd` |
+| Classe | `extends GutTest` (pas de `class_name`) |
+| Méthode de test | `func test_<description>() -> void:` |
+| Assertion | `assert_eq(valeur, attendu, "message")` |
+| Setup | `func before_each() -> void:` / `func before_all() -> void:` |
+
+**Règle** : toute nouvelle logique gameplay cœur (géométrie, état de grille, calculs de stats) devrait idéalement s'accompagner d'un test GUT dans `res://test/unit/`, en suivant le modèle de `test_board_geometry.gd`.
