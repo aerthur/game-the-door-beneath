@@ -142,6 +142,34 @@ Chaque `Monster` porte deux champs :
 
 Pour ajouter une nouvelle vitesse (ex. `move_speed = 3` → `move_period_ticks = 4`), il suffit d'ajouter l'entrée dans `MONSTER_DEFS` ; la conversion est automatique dans `Monster.setup_from_def()`. Les futurs cooldowns d'actions, délais de comportement ou durées de statuts doivent tous s'exprimer en ticks en utilisant `GameData.TICKS_PER_SECOND` comme référence.
 
+### Politique de respawn avec retry prioritaire (issue #70)
+
+Quand un monstre s'échappe en bas d'une file, deux nouveaux monstres sont spawnés via `_on_monster_escaped`. Le respawn utilise `enemies.request_respawn(mtype, lane)` au lieu de `spawn_monster` direct, pour éviter le fallback immédiat vers une file adjacente si la cellule d'entrée (row=0) est momentanément occupée.
+
+**Priorité stricte sur la file d'origine pendant 12 ticks :**
+
+1. Tentative immédiate sur la file d'origine (row=0, col=lane).
+2. Si occupée/bloquée → mise en file d'attente (`pending_respawns`).
+3. À chaque tick (`_do_tick` appelle `enemies.process_pending_respawns()`) : nouvelle tentative sur la file d'origine.
+4. Dès que la cellule se libère (≤ 12 ticks) → spawn dans la file d'origine.
+5. Après 12 ticks d'échec → fallback vers les files adjacentes (même ordre que `find_spawn_lane`).
+6. Si aucune file disponible → abandon explicite, `monsters_remaining` décrémenté.
+
+**API dans `game_enemies.gd` :**
+
+```gdscript
+enemies.RETRY_WINDOW_TICKS                     # const = 12 (GameData.TICKS_PER_SECOND)
+enemies.pending_respawns                       # Array — file en attente
+enemies.request_respawn(monster_id, lane) -> bool    # true = spawn immédiat, false = en attente
+enemies.resolve_pending_respawn_lane(req) -> int     # -1 = attente, -2 = abandon, >=0 = lane cible
+enemies.process_pending_respawns() -> Dictionary     # { spawned, abandoned } — appelé par _do_tick
+enemies.clear_pending_respawns()                     # appelé par _start_room
+```
+
+`_check_room_clear()` vérifie `enemies.pending_respawns.is_empty()` en plus de `spawns_in_flight == 0` pour éviter un clear prématuré.
+
+**Tests :** `test/unit/test_spawn_fallback.gd` — section "Politique de retry/fallback — issue #70".
+
 ### BoardState — occupation de la grille
 
 `board_state.gd` déclare `class_name BoardState` (extends RefCounted). Source de vérité unique pour l'occupation des cellules 5×8. Instanciée dans `game.gd` et partagée avec `game_enemies.gd` et `game_weapons.gd` via `board_state`.

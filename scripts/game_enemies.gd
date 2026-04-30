@@ -11,6 +11,13 @@ var board_state   : BoardState  # source de vérité partagée avec game.gd
 
 var _scene_cache  : Dictionary = {}  # scene_path → PackedScene
 
+# ── Système de respawn avec retry prioritaire (issue #70) ────────
+# Fenêtre de retry = 12 ticks (1 s à 12 tps) avant fallback adjacent.
+const RETRY_WINDOW_TICKS : int = GameData.TICKS_PER_SECOND
+
+# File des respawns en attente : { monster_id, lane, ticks_waited }
+var pending_respawns : Array = []
+
 func _get_scene(scene_path: String) -> PackedScene:
 	if not _scene_cache.has(scene_path):
 		_scene_cache[scene_path] = load(scene_path)
@@ -121,6 +128,91 @@ func find_spawn_lane(preferred: int) -> int:
 		if l >= 0 and l < BoardGeometry.GRID_COLUMNS and board_state.is_cell_free(0, l) and not board_state.is_cell_blocked(0, l):
 			return l
 	return -1
+
+# ── Retry prioritaire sur la file d'origine (issue #70) ─────────
+
+# Tente le spawn strictement sur la lane donnée (row 0, col lane).
+# Pas de fallback. Retourne true si spawn réussi.
+func _try_spawn_in_lane(monster_id: String, lane: int) -> bool:
+	if not GameData.MONSTER_DEFS.has(monster_id): return false
+	if not board_state.is_cell_free(0, lane) or board_state.is_cell_blocked(0, lane): return false
+	var def = GameData.MONSTER_DEFS[monster_id]
+	var r : int = 0
+	while r < BoardGeometry.GRID_ROWS and (board_state.is_cell_occupied(r, lane) or board_state.is_cell_blocked(r, lane)):
+		r += 1
+	if r >= BoardGeometry.GRID_ROWS: return false
+	var m = _get_scene(def["scene"]).instantiate()
+	m.setup_from_def(monster_id, def)
+	monsters_node.add_child(m)
+	m.position  = grid_pos(r, lane)
+	m.grid_row  = r
+	m.grid_lane = lane
+	board_state.set_cell_occupied(r, lane, m)
+	return true
+
+# Tente un spawn sur la file d'origine.
+# Si la cellule d'entrée est occupée/bloquée, met en file d'attente.
+# Retourne true si spawn immédiat, false si mis en attente.
+func request_respawn(monster_id: String, preferred_lane: int) -> bool:
+	if _try_spawn_in_lane(monster_id, preferred_lane):
+		return true
+	pending_respawns.append({
+		"monster_id": monster_id,
+		"lane": preferred_lane,
+		"ticks_waited": 0,
+	})
+	return false
+
+# Décision pure (sans effet de bord) pour un respawn en attente.
+# Retourne : lane >= 0 → spawner là ; -1 → rester en attente ; -2 → abandonner.
+func resolve_pending_respawn_lane(req: Dictionary) -> int:
+	if board_state.is_cell_free(0, req["lane"]) and not board_state.is_cell_blocked(0, req["lane"]):
+		return req["lane"]
+	if req["ticks_waited"] >= RETRY_WINDOW_TICKS:
+		var fallback = _find_fallback_lane(req["lane"])
+		return fallback if fallback >= 0 else -2
+	return -1
+
+# Traite tous les respawns en attente à chaque tick (appelé par game.gd._do_tick).
+# Retourne { "spawned": int, "abandoned": int } pour mise à jour de monsters_remaining.
+func process_pending_respawns() -> Dictionary:
+	if pending_respawns.is_empty():
+		return { "spawned": 0, "abandoned": 0 }
+	var spawned   : int = 0
+	var abandoned : int = 0
+	var still_pending : Array = []
+	for req in pending_respawns:
+		req["ticks_waited"] += 1
+		var target_lane : int = resolve_pending_respawn_lane(req)
+		if target_lane == -1:
+			still_pending.append(req)
+			continue
+		if target_lane == -2:
+			abandoned += 1
+			print("[RESPAWN] Abandon type=%s file %d — %d ticks expirés, aucune lane disponible" % [req["monster_id"], req["lane"]+1, req["ticks_waited"]])
+			continue
+		if _try_spawn_in_lane(req["monster_id"], target_lane):
+			spawned += 1
+			if target_lane == req["lane"]:
+				print("[RESPAWN] type=%s file %d — spawn réussi après %d ticks" % [req["monster_id"], req["lane"]+1, req["ticks_waited"]])
+			else:
+				print("[RESPAWN] type=%s file %d → fallback file %d après %d ticks" % [req["monster_id"], req["lane"]+1, target_lane+1, req["ticks_waited"]])
+		else:
+			abandoned += 1
+			print("[RESPAWN] type=%s file %d — spawn échoué sur file %d, abandon" % [req["monster_id"], req["lane"]+1, target_lane+1])
+	pending_respawns = still_pending
+	return { "spawned": spawned, "abandoned": abandoned }
+
+func _find_fallback_lane(original_lane: int) -> int:
+	for offset in [1, -1, 2, -2, 3, -3, 4, -4]:
+		var l = original_lane + offset
+		if l >= 0 and l < BoardGeometry.GRID_COLUMNS:
+			if board_state.is_cell_free(0, l) and not board_state.is_cell_blocked(0, l):
+				return l
+	return -1
+
+func clear_pending_respawns() -> void:
+	pending_respawns.clear()
 
 # ── Retraite du boss ─────────────────────────────────────────────
 func boss_retreat(boss: Node2D, lane: int):

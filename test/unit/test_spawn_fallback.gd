@@ -1,8 +1,9 @@
 extends GutTest
 
 # Tests de non-régression : logique de spawn (find_spawn_lane, _resolve_spawn_ctx)
-# Couvre : mapping entry_side → coordonnées grille, retry prioritaire, fallback de lane,
-#          cas limites (all occupied, all blocked, lanes de bord)
+# et politique de respawn avec retry prioritaire (issue #70).
+# Couvre : mapping entry_side → coordonnées grille, retry sur file d'origine (12 ticks),
+#          fallback adjacent après expiration, abandon si aucune lane, cas limites.
 
 var _state: BoardState
 var _enemies: Node
@@ -102,3 +103,55 @@ func test_find_spawn_lane_four_occupied_still_finds_one() -> void:
 		_state.set_cell_occupied(0, c, "m")
 	var lane := _enemies.find_spawn_lane(0)
 	assert_eq(lane, 4, "4 lanes occupées depuis 0 → fallback sur la dernière lane libre (4)")
+
+# ── Politique de retry/fallback — issue #70 ──────────────────────
+# resolve_pending_respawn_lane est une fonction pure (pas de side-effect).
+# Valeurs de retour : lane >= 0 → spawner là ; -1 → rester en attente ; -2 → abandonner.
+
+func test_request_respawn_queues_when_lane_occupied() -> void:
+	_state.set_cell_occupied(0, 2, "m")
+	var spawned := _enemies.request_respawn("g", 2)
+	assert_false(spawned, "Lane occupée → request_respawn retourne false (en attente)")
+	assert_eq(_enemies.pending_respawns.size(), 1, "Un respawn en attente créé")
+	assert_eq(_enemies.pending_respawns[0]["lane"], 2, "Lane d'origine mémorisée")
+	assert_eq(_enemies.pending_respawns[0]["ticks_waited"], 0, "Compteur initialisé à 0")
+
+func test_resolve_pending_stays_minus1_within_window() -> void:
+	_state.set_cell_occupied(0, 2, "m")
+	var req := { "monster_id": "g", "lane": 2, "ticks_waited": 0 }
+	for i in range(GameData.TICKS_PER_SECOND - 1):
+		req["ticks_waited"] = i + 1
+		var result := _enemies.resolve_pending_respawn_lane(req)
+		assert_eq(result, -1, "Tick %d < %d : lane occupée → reste en attente" % [i+1, GameData.TICKS_PER_SECOND])
+
+func test_resolve_pending_returns_origin_when_freed_within_window() -> void:
+	# Reproduit le bug corrigé : sans le retry, un fallback immédiat était déclenché
+	# même si la lane d'origine allait se libérer dans la fenêtre de 12 ticks.
+	_state.set_cell_occupied(0, 2, "m")
+	var req := { "monster_id": "g", "lane": 2, "ticks_waited": 5 }
+	_state.clear_cell(0, 2)  # la cellule se libère au tick 5
+	var result := _enemies.resolve_pending_respawn_lane(req)
+	assert_eq(result, 2, "Lane d'origine libérée à t=5 (< 12) → retourne lane 2, sans fallback adjacent")
+
+func test_resolve_pending_falls_back_after_timeout() -> void:
+	_state.set_cell_occupied(0, 2, "m")
+	# lanes 1 et 3 libres, fenêtre expirée
+	var req := { "monster_id": "g", "lane": 2, "ticks_waited": GameData.TICKS_PER_SECOND }
+	var result := _enemies.resolve_pending_respawn_lane(req)
+	assert_ne(result, -1, "Fenêtre expirée → ne reste plus en attente")
+	assert_ne(result, -2, "Lane adjacente disponible → pas d'abandon")
+	assert_ne(result, 2, "Lane d'origine toujours occupée → pas la lane 2")
+	assert_true(result >= 0 and result < BoardGeometry.GRID_COLUMNS, "Fallback dans les bornes valides")
+
+func test_resolve_pending_abandons_when_all_blocked_after_timeout() -> void:
+	for c in BoardGeometry.GRID_COLUMNS:
+		_state.set_cell_occupied(0, c, "m")
+	var req := { "monster_id": "g", "lane": 2, "ticks_waited": GameData.TICKS_PER_SECOND }
+	var result := _enemies.resolve_pending_respawn_lane(req)
+	assert_eq(result, -2, "Toutes les lanes bloquées + fenêtre expirée → abandon (-2)")
+
+func test_pending_respawns_cleared_between_tests() -> void:
+	_state.set_cell_occupied(0, 0, "m")
+	_enemies.request_respawn("g", 0)
+	_enemies.clear_pending_respawns()
+	assert_eq(_enemies.pending_respawns.size(), 0, "clear_pending_respawns vide la file")

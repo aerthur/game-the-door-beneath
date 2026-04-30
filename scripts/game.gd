@@ -130,6 +130,8 @@ func _start_room(num: int):
 	hud.update_room(room_num)
 	hud.hide_door()
 
+	enemies.clear_pending_respawns()
+
 	if room_num % 5 == 0:
 		monsters_remaining = enemies.spawn_boss(room_num)
 	else:
@@ -194,27 +196,29 @@ func _do_tick():
 					var tw = create_tween()
 					tw.tween_property(m, "position", grid_pos(new_row, l), 0.25)
 
+	# Retry des respawns en attente après déplacement de tous les monstres
+	var respawn_result = enemies.process_pending_respawns()
+	if respawn_result["abandoned"] > 0:
+		monsters_remaining = max(0, monsters_remaining - respawn_result["abandoned"])
+		print("[TICK] %d respawn(s) abandonnés — remaining: %d" % [respawn_result["abandoned"], monsters_remaining])
+		_check_room_clear()
+
 func _on_monster_escaped(lane: int, mtype: String):
 	spawns_in_flight += 1
 	var before = monsters_remaining
 	monsters_remaining += 1
 
-	var s1 = enemies.spawn_monster(mtype, { "entry_side": "top", "entry_index": lane })
-	if not s1:
-		monsters_remaining -= 1
-		print("[ESCAPE] File %d type=%s — spawn1 RATÉ — remaining: %d→%d" % [lane+1, mtype, before, monsters_remaining])
-	else:
-		print("[ESCAPE] File %d type=%s — spawn1 ok — remaining: %d→%d" % [lane+1, mtype, before, monsters_remaining])
+	# Spawn1 : file d'origine prioritaire, retry sur 12 ticks si occupée
+	var s1 = enemies.request_respawn(mtype, lane)
+	print("[ESCAPE] File %d type=%s — spawn1 %s — remaining: %d→%d" % [lane+1, mtype, "immédiat" if s1 else "en attente", before, monsters_remaining])
 
 	await get_tree().create_timer(0.35).timeout
 
 	if not game_over:
-		var s2 = enemies.spawn_monster(mtype, { "entry_side": "top", "entry_index": lane })
-		if not s2:
-			monsters_remaining -= 1
-			print("[ESCAPE] File %d type=%s — spawn2 RATÉ — remaining: %d" % [lane+1, mtype, monsters_remaining])
-		else:
-			print("[ESCAPE] File %d type=%s — spawn2 ok — remaining: %d" % [lane+1, mtype, monsters_remaining])
+		# Spawn2 : même logique de retry prioritaire
+		monsters_remaining += 1
+		var s2 = enemies.request_respawn(mtype, lane)
+		print("[ESCAPE] File %d type=%s — spawn2 %s — remaining: %d" % [lane+1, mtype, "immédiat" if s2 else "en attente", monsters_remaining])
 
 	spawns_in_flight -= 1
 	_check_room_clear()
@@ -251,7 +255,7 @@ func _add_gold(amount: int):
 
 func _check_room_clear():
 	if room_clear or game_over: return
-	if _grid_empty() and spawns_in_flight == 0:
+	if _grid_empty() and spawns_in_flight == 0 and enemies.pending_respawns.is_empty():
 		if monsters_remaining != 0:
 			print("[CLEAR] Correction compteur dérivé: remaining %d → 0" % monsters_remaining)
 			monsters_remaining = 0
