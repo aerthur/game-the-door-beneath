@@ -464,3 +464,84 @@ Ce système est conçu pour supporter un futur mode où les ennemis spawneraient
 - Visuels → `game_visuals.gd`
 - Records → `game_records.gd`
 - Constantes → `game_constants.gd` (GameData)
+
+---
+
+## Tests unitaires — GUT (issue #83)
+
+### Framework installé
+
+Le projet utilise **GUT 9.x** (Godot Unit Test), compatible Godot 4.x.
+
+GUT n'est **pas commité dans le dépôt** : il doit être installé avant utilisation.
+
+**Installation locale (une seule fois) :**
+```bash
+bash scripts/install_gut.sh
+```
+Puis dans Godot : *Project > Project Settings > Plugins > Gut > Enable*.
+
+### Arborescence des tests
+
+```
+test/
+└── unit/          ← tests unitaires purs (logique, pas de scène)
+    ├── test_board_geometry.gd
+    └── test_board_state.gd
+```
+
+Futurs dossiers à prévoir : `test/integration/` pour les tests nécessitant des scènes.
+
+### Commandes CLI
+
+**Lancer tous les tests unitaires :**
+```bash
+godot --headless --path . -s addons/gut/gut_cmdln.gd -gconfig=.gutconfig.json -gexit
+```
+
+**Lancer un fichier de test précis :**
+```bash
+godot --headless --path . -s addons/gut/gut_cmdln.gd \
+  -gconfig=.gutconfig.json \
+  -gtest=res://test/unit/test_board_geometry.gd \
+  -gexit
+```
+
+**Lancer un test ciblé par nom :**
+```bash
+godot --headless --path . -s addons/gut/gut_cmdln.gd \
+  -gconfig=.gutconfig.json \
+  -gunit_test_name=test_grid_has_five_columns \
+  -gexit
+```
+
+Code de retour : **0** si tous les tests passent, **non-zero** en cas d'échec — exploitable par les scripts CI et les agents automatisés.
+
+### Configuration
+
+`.gutconfig.json` à la racine du projet :
+- `dirs` : `["res://test/unit/"]`
+- `prefix` : `test_` (les fichiers de test commencent par `test_`)
+- `suffix` : `.gd`
+
+### GitHub Actions
+
+Le workflow **`.github/workflows/gut-tests.yml`** se déclenche sur **tous les push et toutes les pull_request** (toutes branches). Il :
+1. Installe Godot (version définie dans `env.GODOT_VERSION`)
+2. Installe GUT (version définie dans `env.GUT_VERSION`)
+3. Lance la commande GUT CLI ci-dessus
+4. Renvoie un statut vert/rouge sur chaque commit et PR
+
+### Conventions pour les nouveaux tests
+
+| Règle | Valeur |
+|---|---|
+| Dossier | `res://test/unit/` |
+| Préfixe fichier | `test_` (ex: `test_game_weapons.gd`) |
+| Classe de base | `extends GutTest` |
+| Préfixe méthode | `test_` (ex: `func test_dague_deals_damage()`) |
+| Nommage | snake_case, description précise de ce qui est testé |
+| Setup | `before_each()` pour réinitialiser l'état entre les tests |
+| Teardown | Toujours `free()` les Node2D créés dans les tests |
+
+**Règle de design :** toute nouvelle logique gameplay cœur (arme, monstre, mécanique de grille) devrait idéalement être accompagnée d'un test GUT dans `res://test/unit/` suivant ce modèle. Les tests existants (`test_board_geometry.gd`, `test_board_state.gd`) servent de template.

@@ -1,0 +1,12 @@
+{
+    "dirs": ["res://test/unit/"],
+    "prefix": "test_",
+    "suffix": ".gd",
+    "include_subdirs": false,
+    "gut_on_path": true,
+    "log_level": 1,
+    "ignore_pause": true,
+    "color_output": true,
+    "double_strategy": "script_only",
+    "inner_class_prefix": "Test"
+}
