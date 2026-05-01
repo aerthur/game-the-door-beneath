@@ -37,7 +37,6 @@ jobs:
           mkdir -p build/web
           Godot_v4.6-stable_linux.x86_64 --headless --export-release "Web" build/web/index.html
 
-      # CORRECTION : Création du dossier final avant publication
       - name: Prepare preview directory
         run: |
           mkdir -p public/previews/pr-${{ github.event.pull_request.number }}
@@ -57,36 +56,36 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const prNumber = context.payload.pull_request.number;
-            const repoOwner = context.repo.owner;
-            const repoName = context.repo.repo;
-            const previewUrl = `https://${repoOwner}.github.io/${repoName}/previews/pr-${prNumber}/`;
-            const body = `### 🌐 Preview Web
+            const pr = context.payload.pull_request.number;
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const url = "https://" + owner + ".github.io/" + repo + "/previews/pr-" + pr + "/";
+            const msg = "### 🌐 Preview Web
 
-[👉 Jouer à la preview de cette PR](${previewUrl})
+[👉 Jouer à la preview de cette PR](" + url + ")
 
-Build mise à jour automatiquement à chaque nouveau commit. Optimisée pour navigateur desktop et mobile en orientation paysage.`;
+Build mise à jour automatiquement. Optimisée pour navigateur desktop et mobile en orientation paysage.";
             
-            const { data: comments } = await github.rest.issues.listComments({
-              owner: repoOwner,
-              repo: repoName,
-              issue_number: prNumber,
+            const comments = await github.rest.issues.listComments({
+              owner: owner,
+              repo: repo,
+              issue_number: pr
             });
             
-            const existing = comments.find(c => c.user.type === 'Bot' && c.body.includes('### 🌐 Preview Web'));
+            const existing = comments.data.find(c => c.user.type === 'Bot' && c.body.includes('### 🌐 Preview Web'));
             
             if (existing) {
               await github.rest.issues.updateComment({
-                owner: repoOwner,
-                repo: repoName,
+                owner: owner,
+                repo: repo,
                 comment_id: existing.id,
-                body: body,
+                body: msg
               });
             } else {
               await github.rest.issues.createComment({
-                owner: repoOwner,
-                repo: repoName,
-                issue_number: prNumber,
-                body: body,
+                owner: owner,
+                repo: repo,
+                issue_number: pr,
+                body: msg
               });
             }
