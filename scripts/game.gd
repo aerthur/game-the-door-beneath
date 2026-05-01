@@ -130,6 +130,7 @@ func _start_room(num: int):
 	hud.update_room(room_num)
 	hud.hide_door()
 
+	enemies.clear_pending_respawns()
 	if room_num % 5 == 0:
 		monsters_remaining = enemies.spawn_boss(room_num)
 	else:
@@ -193,31 +194,36 @@ func _do_tick():
 					m.grid_lane = l
 					var tw = create_tween()
 					tw.tween_property(m, "position", grid_pos(new_row, l), 0.25)
+	# Traitement des respawns en attente après les déplacements
+	_execute_respawn_results(enemies.tick_pending_respawns())
 
-func _on_monster_escaped(lane: int, mtype: String):
-	spawns_in_flight += 1
-	var before = monsters_remaining
+func _on_monster_escaped(lane: int, mtype: String) -> void:
+	spawns_in_flight   += 1
 	monsters_remaining += 1
-
-	var s1 = enemies.spawn_monster(mtype, { "entry_side": "top", "entry_index": lane })
-	if not s1:
-		monsters_remaining -= 1
-		print("[ESCAPE] File %d type=%s — spawn1 RATÉ — remaining: %d→%d" % [lane+1, mtype, before, monsters_remaining])
+	# Tentative immédiate sur la file d'origine uniquement (pas de fallback immédiat)
+	if enemies.try_spawn_preferred(mtype, lane):
+		spawns_in_flight -= 1
+		print("[ESCAPE] File %d type=%s — spawn immédiat — remaining: %d" % [lane+1, mtype, monsters_remaining])
 	else:
-		print("[ESCAPE] File %d type=%s — spawn1 ok — remaining: %d→%d" % [lane+1, mtype, before, monsters_remaining])
+		# File occupée : retry prioritaire pendant 12 ticks avant fallback adjacent
+		enemies.queue_respawn(lane, mtype)
+		print("[ESCAPE] File %d type=%s — spawn différé (retry %d ticks) — remaining: %d" % [lane+1, mtype, GameData.TICKS_PER_SECOND, monsters_remaining])
 
-	await get_tree().create_timer(0.35).timeout
-
-	if not game_over:
-		var s2 = enemies.spawn_monster(mtype, { "entry_side": "top", "entry_index": lane })
-		if not s2:
+# Exécute les actions retournées par enemies.tick_pending_respawns().
+func _execute_respawn_results(results: Array) -> void:
+	for r in results:
+		spawns_in_flight -= 1
+		if r["action"] == "spawn":
+			var ok := enemies.spawn_at(r["mtype"], 0, r["lane"])
+			if not ok:
+				monsters_remaining -= 1
+				print("[RESPAWN] File %d type=%s → spawn échoué — remaining: %d" % [r["preferred_lane"]+1, r["mtype"], monsters_remaining])
+			else:
+				print("[RESPAWN] File %d type=%s → %s lane %d — remaining: %d" % [r["preferred_lane"]+1, r["mtype"], r["status"], r["lane"]+1, monsters_remaining])
+		else:  # abandon
 			monsters_remaining -= 1
-			print("[ESCAPE] File %d type=%s — spawn2 RATÉ — remaining: %d" % [lane+1, mtype, monsters_remaining])
-		else:
-			print("[ESCAPE] File %d type=%s — spawn2 ok — remaining: %d" % [lane+1, mtype, monsters_remaining])
-
-	spawns_in_flight -= 1
-	_check_room_clear()
+			print("[RESPAWN] File %d type=%s → abandonné — remaining: %d" % [r["preferred_lane"]+1, r["mtype"], monsters_remaining])
+		_check_room_clear()
 
 # ── Combat ───────────────────────────────────────────────────────
 func _deal_and_check(m: Node2D, _row: int, _lane: int, dmg: int):

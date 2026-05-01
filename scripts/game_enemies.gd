@@ -9,7 +9,12 @@ extends Node2D
 var monsters_node : Node2D
 var board_state   : BoardState  # source de vérité partagée avec game.gd
 
-var _scene_cache  : Dictionary = {}  # scene_path → PackedScene
+var _scene_cache      : Dictionary = {}  # scene_path → PackedScene
+var _pending_respawns : Array      = []  # respawns en attente (retry 12 ticks)
+
+# Sentinelles pour get_respawn_lane
+const RESPAWN_KEEP_WAITING := -1
+const RESPAWN_GIVE_UP      := -2
 
 func _get_scene(scene_path: String) -> PackedScene:
 	if not _scene_cache.has(scene_path):
@@ -121,6 +126,86 @@ func find_spawn_lane(preferred: int) -> int:
 		if l >= 0 and l < BoardGeometry.GRID_COLUMNS and board_state.is_cell_free(0, l) and not board_state.is_cell_blocked(0, l):
 			return l
 	return -1
+
+# ── Système de respawn prioritaire (issue #70) ───────────────────
+# Détermine la lane cible pour un respawn en attente.
+# preferred    : file d'origine
+# ticks_waited : ticks déjà attendus depuis l'échec initial
+# max_ticks    : fenêtre maximale (GameData.TICKS_PER_SECOND = 12)
+# Retourne : lane >= 0 (spawn ici), RESPAWN_KEEP_WAITING, ou RESPAWN_GIVE_UP.
+func get_respawn_lane(preferred: int, ticks_waited: int, max_ticks: int) -> int:
+	# Toujours tenter la file d'origine en premier
+	if board_state.is_cell_free(0, preferred) and not board_state.is_cell_blocked(0, preferred):
+		return preferred
+	# Fenêtre non expirée : rester en attente
+	if ticks_waited < max_ticks:
+		return RESPAWN_KEEP_WAITING
+	# Fenêtre expirée : fallback sur les files adjacentes
+	for offset in [1, -1, 2, -2, 3, -3, 4, -4]:
+		var l = preferred + offset
+		if l >= 0 and l < BoardGeometry.GRID_COLUMNS \
+				and board_state.is_cell_free(0, l) \
+				and not board_state.is_cell_blocked(0, l):
+			return l
+	return RESPAWN_GIVE_UP
+
+# Enfile un respawn en attente sur la file d'origine.
+# Appelé par game.gd quand try_spawn_preferred échoue.
+func queue_respawn(lane: int, mtype: String) -> void:
+	_pending_respawns.append({
+		"preferred_lane": lane,
+		"mtype":          mtype,
+		"ticks_waited":   0,
+		"max_ticks":      GameData.TICKS_PER_SECOND,
+	})
+
+# Traite tous les respawns en attente — appelé à chaque tick par game.gd.
+# Retourne la liste des actions à effectuer (pas de spawn ici, pas de dépendance scène).
+# Chaque entrée : {action:"spawn"|"abandon", status:"success"|"fallback"|"", mtype, preferred_lane, lane?}
+func tick_pending_respawns() -> Array:
+	var results       : Array = []
+	var still_pending : Array = []
+	for p in _pending_respawns:
+		var target : int = get_respawn_lane(p["preferred_lane"], p["ticks_waited"], p["max_ticks"])
+		if target == RESPAWN_KEEP_WAITING:
+			p["ticks_waited"] += 1
+			still_pending.append(p)
+		elif target == RESPAWN_GIVE_UP:
+			results.append({ "action": "abandon", "status": "", "mtype": p["mtype"], "preferred_lane": p["preferred_lane"] })
+		else:
+			var status : String = "success" if target == p["preferred_lane"] else "fallback"
+			results.append({
+				"action":         "spawn",
+				"status":         status,
+				"mtype":          p["mtype"],
+				"preferred_lane": p["preferred_lane"],
+				"lane":           target,
+			})
+	_pending_respawns = still_pending
+	return results
+
+# Spawn sur une cellule exacte (row, lane), sans recherche de lane alternative.
+func spawn_at(monster_id: String, row: int, lane: int) -> bool:
+	if not GameData.MONSTER_DEFS.has(monster_id): return false
+	var def := GameData.MONSTER_DEFS[monster_id]
+	var m   = _get_scene(def["scene"]).instantiate()
+	m.setup_from_def(monster_id, def)
+	monsters_node.add_child(m)
+	m.position  = grid_pos(row, lane)
+	m.grid_row  = row
+	m.grid_lane = lane
+	board_state.set_cell_occupied(row, lane, m)
+	return true
+
+# Tentative immédiate sur la file préférée uniquement, sans fallback.
+func try_spawn_preferred(monster_id: String, lane: int) -> bool:
+	if not board_state.is_cell_free(0, lane) or board_state.is_cell_blocked(0, lane):
+		return false
+	return spawn_at(monster_id, 0, lane)
+
+# Réinitialise la file d'attente (appelé au démarrage de chaque salle).
+func clear_pending_respawns() -> void:
+	_pending_respawns.clear()
 
 # ── Retraite du boss ─────────────────────────────────────────────
 func boss_retreat(boss: Node2D, lane: int):
