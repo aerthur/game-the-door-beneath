@@ -44,7 +44,36 @@ jobs:
         shell: bash
         run: |
           mkdir -p build/web
+
+          if [ -d "addons/gut" ]; then
+            mv addons/gut addons/gut_hidden
+          fi
+
+          if [ -d "test" ]; then
+            mv test test_hidden
+          fi
+
+          if [ -d "tests" ]; then
+            mv tests tests_hidden
+          fi
+
           Godot_v4.6-stable_linux.x86_64 --headless --export-release "Web" build/web/index.html
+
+          if [ -d "addons/gut_hidden" ]; then
+            mv addons/gut_hidden addons/gut
+          fi
+
+          if [ -d "test_hidden" ]; then
+            mv test_hidden test
+          fi
+
+          if [ -d "tests_hidden" ]; then
+            mv tests_hidden tests
+          fi
+
+          echo "=== build/web ==="
+          find build/web -maxdepth 2 -type f | sort
+          test -f build/web/index.html
 
       - name: Prepare preview directory
         shell: bash
@@ -52,8 +81,11 @@ jobs:
           PR_NUMBER="${{ github.event.pull_request.number }}"
           TARGET_DIR="public/previews/pr-${PR_NUMBER}"
           mkdir -p "$TARGET_DIR"
-          cp -r build/web/* "$TARGET_DIR"/
+          cp -a build/web/. "$TARGET_DIR"/
           touch public/.nojekyll
+          echo "=== public ==="
+          find public -maxdepth 4 -type f | sort
+          test -f "$TARGET_DIR/index.html"
 
       - name: Deploy preview to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
