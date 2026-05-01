@@ -1,5 +1,5 @@
 extends CanvasLayer
-# Dernière mise à jour : 2026-04-21
+# Dernière mise à jour : 2026-05-01
 
 @onready var hp_bar     : ProgressBar = $TopLeft/VBox/HPBar
 @onready var hp_label   : Label       = $TopLeft/VBox/HPLabel
@@ -14,6 +14,9 @@ extends CanvasLayer
 @onready var lvlup_hbox : HBoxContainer = $LevelUp/Panel/VBox/Cards
 @onready var go_panel      : Control = $GameOver
 @onready var version_label : Label   = $VersionLabel
+@onready var touch_buttons    : Control = $TouchButtons
+@onready var btn_next_room    : Button  = $TouchButtons/BtnNextRoom
+@onready var portrait_warning : Control = $PortraitWarning
 
 var _current_choices : Array = []
 
@@ -21,6 +24,7 @@ func _ready():
 	door_hint.visible   = false
 	lvlup_panel.visible = false
 	go_panel.visible    = false
+	btn_next_room.visible = false
 	version_label.text  = "v" + ProjectSettings.get_setting("application/config/version", "0.1.0")
 
 	var sword_lbl = Label.new()
@@ -38,6 +42,21 @@ func _ready():
 		btn_restart.pressed.connect(_on_restart_pressed)
 	if not btn_menu.pressed.is_connected(_on_menu_principal_pressed):
 		btn_menu.pressed.connect(_on_menu_principal_pressed)
+
+	# Contrôles tactiles
+	var btn_left  : Button = $TouchButtons/BtnLeft
+	var btn_right : Button = $TouchButtons/BtnRight
+	btn_left.button_down.connect(_on_touch_left)
+	btn_right.button_down.connect(_on_touch_right)
+	btn_next_room.button_down.connect(_on_touch_next_room)
+	btn_left.add_theme_font_size_override("font_size", 36)
+	btn_right.add_theme_font_size_override("font_size", 36)
+	btn_next_room.add_theme_font_size_override("font_size", 22)
+	$PortraitWarning/Panel/VBox/Icon.add_theme_font_size_override("font_size", 80)
+	$PortraitWarning/Panel/VBox/Message.add_theme_font_size_override("font_size", 26)
+
+	get_viewport().size_changed.connect(_check_orientation)
+	_check_orientation()
 
 
 # ── HP ───────────────────────────────────────────────────────────
@@ -78,9 +97,38 @@ func update_weapons(weapons: Array):
 		weapon_vbox.add_child(sep)
 		weapon_vbox.add_child(lbl)
 
+# ── Orientation mobile ───────────────────────────────────────────
+func _check_orientation() -> void:
+	var size := get_viewport().get_visible_rect().size
+	portrait_warning.visible = size.y > size.x
+
+# ── Contrôles tactiles ───────────────────────────────────────────
+func _on_touch_left() -> void:
+	var ev := InputEventAction.new()
+	ev.action = "lane_left"
+	ev.pressed = true
+	Input.parse_input_event(ev)
+
+func _on_touch_right() -> void:
+	var ev := InputEventAction.new()
+	ev.action = "lane_right"
+	ev.pressed = true
+	Input.parse_input_event(ev)
+
+func _on_touch_next_room() -> void:
+	var ev := InputEventAction.new()
+	ev.action = "next_room"
+	ev.pressed = true
+	Input.parse_input_event(ev)
+
 # ── Porte ────────────────────────────────────────────────────────
-func show_door(): door_hint.visible = true
-func hide_door(): door_hint.visible = false
+func show_door():
+	door_hint.visible = true
+	btn_next_room.visible = true
+
+func hide_door():
+	door_hint.visible = false
+	btn_next_room.visible = false
 
 # ── Level up ─────────────────────────────────────────────────────
 func show_level_up(choices: Array):

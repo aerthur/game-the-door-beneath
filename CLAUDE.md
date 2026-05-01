@@ -375,6 +375,28 @@ Scaling : `pow(1.5, (room - 15) / 5)` appliqué à hp, damage, xp_value au momen
 - `lane_right` → flèche droite
 - `next_room` → ESPACE
 
+## Support mobile / web (issue #91)
+
+Le jeu supporte une expérience tactile sur navigateur mobile en **orientation paysage uniquement**.
+
+### Orientation
+- `project.godot` force `window/handheld/orientation = "landscape"` sur mobile.
+- En portrait, `hud.gd` détecte automatiquement via `get_viewport().size_changed` et affiche un overlay plein écran invitant à tourner l'appareil. Aucune expérience de jeu n'est proposée en portrait.
+
+### Contrôles tactiles
+Trois boutons sont intégrés en bas de l'écran dans `hud.tscn` (`TouchButtons`), au-dessus de la zone XP :
+- **BtnLeft** (bas-gauche, 160×120 px) — déplacement à gauche
+- **BtnRight** (bas-droit, 160×120 px) — déplacement à droite
+- **BtnNextRoom** (centre-bas, 300×74 px) — passage à la salle suivante (visible uniquement quand la salle est vidée)
+
+### Architecture d'input unifiée
+Les boutons tactiles réutilisent les **actions Godot canoniques** (`lane_left`, `lane_right`, `next_room`) via `Input.parse_input_event(InputEventAction)`. Le flux est identique au clavier : les événements transitent par `game.gd._input()` → `game_player.handle_input()`. Il n'existe qu'un seul chemin de contrôle.
+
+### Fichiers concernés
+- `project.godot` — orientation paysage forcée
+- `scenes/ui/hud.tscn` — nœuds `TouchButtons` et `PortraitWarning`
+- `scripts/hud.gd` — `_check_orientation()`, `_on_touch_left/right/next_room()`
+
 ## Taille de référence des gobelins (issue #4)
 
 Tous les gobelins partagent la même géométrie (monster_blob.tscn). Seule la couleur change.
