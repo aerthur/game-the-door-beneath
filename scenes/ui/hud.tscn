@@ -197,5 +197,79 @@ offset_bottom = -4.0
 text = "v0.1.0"
 horizontal_alignment = 2
 
+[node name="TouchButtons" type="Control" parent="."]
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="BtnLeft" type="Button" parent="TouchButtons"]
+anchor_left = 0.0
+anchor_top = 1.0
+anchor_right = 0.0
+anchor_bottom = 1.0
+offset_left = 4.0
+offset_top = -176.0
+offset_right = 164.0
+offset_bottom = -56.0
+text = "◀"
+
+[node name="BtnRight" type="Button" parent="TouchButtons"]
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -164.0
+offset_top = -176.0
+offset_right = -4.0
+offset_bottom = -56.0
+text = "▶"
+
+[node name="BtnNextRoom" type="Button" parent="TouchButtons"]
+visible = false
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -150.0
+offset_top = -130.0
+offset_right = 150.0
+offset_bottom = -56.0
+text = "🚪 Continuer"
+
+[node name="PortraitWarning" type="Control" parent="."]
+visible = false
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="BG" type="ColorRect" parent="PortraitWarning"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0.04, 0.04, 0.06, 0.95)
+
+[node name="Panel" type="PanelContainer" parent="PortraitWarning"]
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -220.0
+offset_top = -120.0
+offset_right = 220.0
+offset_bottom = 120.0
+
+[node name="VBox" type="VBoxContainer" parent="PortraitWarning/Panel"]
+layout_mode = 2
+alignment = 1
+
+[node name="Icon" type="Label" parent="PortraitWarning/Panel/VBox"]
+text = "↻"
+horizontal_alignment = 1
+
+[node name="Message" type="Label" parent="PortraitWarning/Panel/VBox"]
+text = "Tournez votre appareil\nen orientation paysage"
+horizontal_alignment = 1
+autowrap_mode = 1
+
 [connection signal="pressed" from="GameOver/Panel/VBox/Restart" to="HUD" method="_on_restart_pressed"]
 [connection signal="pressed" from="GameOver/Panel/VBox/MenuPrincipal" to="HUD" method="_on_menu_principal_pressed"]
