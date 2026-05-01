@@ -2,7 +2,10 @@ name: HTML5 Preview
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
+    types:
+      - opened
+      - synchronize
+      - reopened
 
 permissions:
   contents: write
@@ -10,20 +13,22 @@ permissions:
 
 jobs:
   build-and-preview:
-    name: Export HTML5 and deploy PR preview
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Install Godot 4.6
+        shell: bash
         run: |
           wget -q https://github.com/godotengine/godot/releases/download/4.6-stable/Godot_v4.6-stable_linux.x86_64.zip -O tmp_godot.zip
           unzip -q tmp_godot.zip -d tmp_godot
           chmod +x tmp_godot/Godot_v4.6-stable_linux.x86_64
-          echo "$PWD/tmp_godot" >> $GITHUB_PATH
+          echo "$PWD/tmp_godot" >> "$GITHUB_PATH"
 
       - name: Install Godot export templates
+        shell: bash
         run: |
           mkdir -p ~/.local/share/godot/export_templates/4.6.stable
           wget -q https://github.com/godotengine/godot/releases/download/4.6-stable/Godot_v4.6-stable_export_templates.tpz -O tmp_templates.tpz
@@ -31,25 +36,32 @@ jobs:
           cp -r tmp_templates/templates/* ~/.local/share/godot/export_templates/4.6.stable/
 
       - name: Import project assets
-        run: Godot_v4.6-stable_linux.x86_64 --headless --import --quit
+        shell: bash
+        run: |
+          Godot_v4.6-stable_linux.x86_64 --headless --import --quit || true
 
       - name: Export HTML5
+        shell: bash
         run: |
           mkdir -p build/web
           Godot_v4.6-stable_linux.x86_64 --headless --export-release "Web" build/web/index.html
 
       - name: Prepare preview directory
+        shell: bash
         run: |
-          mkdir -p public/previews/pr-${{ github.event.pull_request.number }}
-          cp -r build/web/* public/previews/pr-${{ github.event.pull_request.number }}/
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          TARGET_DIR="public/previews/pr-${PR_NUMBER}"
+          mkdir -p "$TARGET_DIR"
+          cp -r build/web/* "$TARGET_DIR"/
+          touch public/.nojekyll
 
       - name: Deploy preview to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./public
-          keep_files: true
           publish_branch: gh-pages
+          keep_files: true
           force_orphan: false
           enable_jekyll: false
 
@@ -61,32 +73,30 @@ jobs:
             const owner = context.repo.owner;
             const repo = context.repo.repo;
             const url = "https://" + owner + ".github.io/" + repo + "/previews/pr-" + pr + "/";
-            const msg = "### 🌐 Preview Web
+            const body = "Preview Web - URL: " + url + " - Build mise a jour automatiquement a chaque nouveau commit. Optimise pour navigateur desktop et mobile en orientation paysage.";
 
-[👉 Jouer à la preview de cette PR](" + url + ")
-
-Build mise à jour automatiquement. Optimisée pour navigateur desktop et mobile en orientation paysage.";
-            
-            const comments = await github.rest.issues.listComments({
+            const response = await github.rest.issues.listComments({
               owner: owner,
               repo: repo,
               issue_number: pr
             });
-            
-            const existing = comments.data.find(c => c.user.type === 'Bot' && c.body.includes('### 🌐 Preview Web'));
-            
+
+            const existing = response.data.find(function(comment) {
+              return comment.user.type === "Bot" && comment.body.indexOf("Preview Web - URL:") !== -1;
+            });
+
             if (existing) {
               await github.rest.issues.updateComment({
                 owner: owner,
                 repo: repo,
                 comment_id: existing.id,
-                body: msg
+                body: body
               });
             } else {
               await github.rest.issues.createComment({
                 owner: owner,
                 repo: repo,
                 issue_number: pr,
-                body: msg
+                body: body
               });
             }
