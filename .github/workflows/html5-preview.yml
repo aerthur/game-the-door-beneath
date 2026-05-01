@@ -1,4 +1,5 @@
 name: HTML5 Preview
+
 on:
   pull_request:
     types: [opened, synchronize, reopened]
