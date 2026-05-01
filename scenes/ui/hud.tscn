@@ -100,6 +100,7 @@ text = "🚪  Salle vidée !  [ ESPACE ] pour continuer"
 horizontal_alignment = 1
 
 [node name="LevelUp" type="Control" parent="."]
+mouse_filter = 2
 visible = false
 anchors_preset = 15
 anchor_right = 1.0
@@ -198,6 +199,7 @@ text = "v0.1.0"
 horizontal_alignment = 2
 
 [node name="TouchButtons" type="Control" parent="."]
+mouse_filter = 2
 anchor_right = 1.0
 anchor_bottom = 1.0
 
