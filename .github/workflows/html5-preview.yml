@@ -1,0 +1,134 @@
+name: HTML5 Preview
+
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  build-and-preview:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Godot 4.6
+        shell: bash
+        run: |
+          wget -q https://github.com/godotengine/godot/releases/download/4.6-stable/Godot_v4.6-stable_linux.x86_64.zip -O tmp_godot.zip
+          unzip -q tmp_godot.zip -d tmp_godot
+          chmod +x tmp_godot/Godot_v4.6-stable_linux.x86_64
+          echo "$PWD/tmp_godot" >> "$GITHUB_PATH"
+
+      - name: Install Godot export templates
+        shell: bash
+        run: |
+          mkdir -p ~/.local/share/godot/export_templates/4.6.stable
+          wget -q https://github.com/godotengine/godot/releases/download/4.6-stable/Godot_v4.6-stable_export_templates.tpz -O tmp_templates.tpz
+          unzip -q tmp_templates.tpz -d tmp_templates
+          cp -r tmp_templates/templates/* ~/.local/share/godot/export_templates/4.6.stable/
+
+      - name: Import project assets
+        shell: bash
+        run: |
+          Godot_v4.6-stable_linux.x86_64 --headless --import --quit || true
+
+      - name: Export HTML5
+        shell: bash
+        run: |
+          mkdir -p build/web
+
+          if [ -d "addons/gut" ]; then
+            mv addons/gut addons/gut_hidden
+          fi
+
+          if [ -d "test" ]; then
+            mv test test_hidden
+          fi
+
+          if [ -d "tests" ]; then
+            mv tests tests_hidden
+          fi
+
+          Godot_v4.6-stable_linux.x86_64 --headless --export-release "Web" build/web/index.html
+
+          if [ -d "addons/gut_hidden" ]; then
+            mv addons/gut_hidden addons/gut
+          fi
+
+          if [ -d "test_hidden" ]; then
+            mv test_hidden test
+          fi
+
+          if [ -d "tests_hidden" ]; then
+            mv tests_hidden tests
+          fi
+
+          echo "=== build/web ==="
+          find build/web -maxdepth 2 -type f | sort
+          test -f build/web/index.html
+
+      - name: Prepare preview directory
+        shell: bash
+        run: |
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          TARGET_DIR="public/previews/pr-${PR_NUMBER}"
+          mkdir -p "$TARGET_DIR"
+          cp -a build/web/. "$TARGET_DIR"/
+          touch public/.nojekyll
+          echo "=== public ==="
+          find public -maxdepth 4 -type f | sort
+          test -f "$TARGET_DIR/index.html"
+
+      - name: Deploy preview to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./public
+          publish_branch: gh-pages
+          keep_files: true
+          force_orphan: false
+          enable_jekyll: false
+
+      - name: Comment PR with preview link
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request.number;
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const url = "https://" + owner + ".github.io/" + repo + "/previews/pr-" + pr + "/";
+            const body = "Preview Web - URL: " + url + " - Build mise a jour automatiquement a chaque nouveau commit. Optimise pour navigateur desktop et mobile en orientation paysage.";
+
+            const response = await github.rest.issues.listComments({
+              owner: owner,
+              repo: repo,
+              issue_number: pr
+            });
+
+            const existing = response.data.find(function(comment) {
+              return comment.user.type === "Bot" && comment.body.indexOf("Preview Web - URL:") !== -1;
+            });
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: owner,
+                repo: repo,
+                comment_id: existing.id,
+                body: body
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: owner,
+                repo: repo,
+                issue_number: pr,
+                body: body
+              });
+            }

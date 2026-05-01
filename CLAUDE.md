@@ -18,9 +18,11 @@ game-the-door-beneath/
 ├── project.godot
 ├── CLAUDE.md
 ├── .gutconfig.json             ← configuration GUT CLI (dossiers, options)
+├── export_presets.cfg          ← preset d'export Godot (Web/HTML5)
 ├── .github/
 │   └── workflows/
-│       └── gut-tests.yml       ← CI GitHub Actions (GUT sur tous push/PR)
+│       ├── gut-tests.yml       ← CI GitHub Actions (GUT sur tous push/PR)
+│       └── html5-preview.yml   ← export HTML5 + déploiement preview par PR
 ├── addons/
 │   └── gut/                    ← framework de tests GUT v9.6.0 (versionné dans le repo)
 ├── test/
@@ -396,6 +398,44 @@ Les boutons tactiles réutilisent les **actions Godot canoniques** (`lane_left`,
 - `project.godot` — orientation paysage forcée
 - `scenes/ui/hud.tscn` — nœuds `TouchButtons` et `PortraitWarning`
 - `scripts/hud.gd` — `_check_orientation()`, `_on_touch_left/right/next_room()`
+
+## Export HTML5 et preview par PR (issue #93)
+
+### Export HTML5
+
+Le projet dispose d'un preset d'export Web dans `export_presets.cfg` (preset nommé `"Web"`).
+
+Commande d'export en ligne de commande :
+```bash
+Godot_v4.6-stable_linux.x86_64 --headless --export-release "Web" build/web/index.html
+```
+
+Les templates d'export doivent être installés dans `~/.local/share/godot/export_templates/4.6.stable/` avant l'export.
+
+### Workflow CI dédié (`.github/workflows/html5-preview.yml`)
+
+Déclenché sur `pull_request` (opened, synchronize, reopened). Séparé du workflow GUT pour garder des responsabilités distinctes :
+
+| Workflow | Fichier | Rôle |
+|---|---|---|
+| Tests GUT | `gut-tests.yml` | Validation logique, tous push + PR |
+| Preview HTML5 | `html5-preview.yml` | Export web + publication preview, PR uniquement |
+
+### Preview par PR
+
+Chaque PR reçoit une preview publiée sur GitHub Pages à l'URL :
+```
+https://<owner>.github.io/<repo>/previews/pr-<numero>/
+```
+
+- Un nouveau commit sur la PR **remplace** la preview existante au même chemin (`keep_files: true`).
+- La PR reçoit un commentaire automatique (créé ou mis à jour) avec le lien de preview.
+- La branche `gh-pages` héberge toutes les previews sous `previews/`.
+- La preview reflète l'export HTML5 complet (HTML + JS + WASM + PCK).
+
+### Nettoyage
+
+Le nettoyage des previews de PR fermées n'est pas automatisé dans la v1. Les dossiers `previews/pr-<numero>/` restent sur la branche `gh-pages` après fermeture de la PR.
 
 ## Taille de référence des gobelins (issue #4)
 

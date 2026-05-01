@@ -2,9 +2,6 @@
 .godot/
 *.uid
 
-# Export presets (may contain credentials)
-export_presets.cfg
-
 # Mono / C# build artifacts
 .mono/
 data_*/
