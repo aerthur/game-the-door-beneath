@@ -59,7 +59,7 @@ func _ready():
 	#weapons.player_lane = player_ctrl.player_lane
 	#dbg.color = Color(1, 0.5, 0, 1); dbg_label.text = "READY 2"
 	_init_grid()
-	_draw_background()
+	#_draw_background()
 	#if OS.has_feature("web"): JavaScriptBridge.eval("alert('AFTER DRAW')")
 	#dbg.color = Color(1, 1, 0, 1); dbg_label.text = "READY 3"
 	#_start_room(1)
