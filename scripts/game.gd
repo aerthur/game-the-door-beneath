@@ -38,6 +38,7 @@ var gem_scene = preload("res://scenes/gem.tscn")
 
 # ═════════════════════════════════════════════════════════════════
 func _ready():
+	OS.alert("ready call OK")
 	var r = ColorRect.new(); r.color = Color(1,0,0,1); r.position = Vector2(40,40); r.size = Vector2(500,200); hud.add_child(r); var lbl = Label.new(); lbl.text = "HUD DEBUG OK"; lbl.position = Vector2(60,100); lbl.scale = Vector2(4,4); lbl.add_theme_color_override("font_color", Color(1,1,0)); hud.add_child(lbl)
 	#if OS.has_feature("web"): JavaScriptBridge.eval("alert('GAME READY START')")
 	#var dbg = ColorRect.new(); dbg.color = Color(1, 0, 0, 1); dbg.position = Vector2(10, 10); dbg.size = Vector2(500, 120); hud.add_child(dbg); var dbg_label = Label.new(); dbg_label.text = "READY 1"; dbg_label.position = Vector2(30, 35); dbg_label.scale = Vector2(3, 3); dbg_label.add_theme_color_override("font_color", Color(1, 1, 0)); hud.add_child(dbg_label)
