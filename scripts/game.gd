@@ -55,7 +55,10 @@ func _ready():
 	player_ctrl.next_room_requested.connect(func(): _start_room(room_num + 1))
 	weapons.player_lane = player_ctrl.player_lane
 	_init_grid()
-	_draw_background()
+    print("DEBUG BEFORE DRAW")
+    _draw_background()
+    print("DEBUG AFTER DRAW")
+	#_draw_background()
 	_start_room(1)
 	hud.update_weapons(active_weapons)
 	hud.update_xp(xp, xp_needed, hero_level)
