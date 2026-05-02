@@ -195,7 +195,7 @@ func _do_tick():
 					var tw = create_tween()
 					tw.tween_property(m, "position", grid_pos(new_row, l), 0.25)
 	# Traitement des respawns en attente après les déplacements
-	//_execute_respawn_results(enemies.tick_pending_respawns())
+	#_execute_respawn_results(enemies.tick_pending_respawns())
 
 func _on_monster_escaped(lane: int, mtype: String) -> void:
 	spawns_in_flight   += 1
