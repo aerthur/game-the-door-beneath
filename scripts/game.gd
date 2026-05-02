@@ -38,8 +38,8 @@ var gem_scene = preload("res://scenes/gem.tscn")
 
 # ═════════════════════════════════════════════════════════════════
 func _ready():
-	if OS.has_feature("web"): JavaScriptBridge.eval("alert('GAME READY START')")
-	#var dbg = ColorRect.new(); dbg.color = Color(1, 0, 0, 1); dbg.position = Vector2(10, 10); dbg.size = Vector2(500, 120); hud.add_child(dbg); var dbg_label = Label.new(); dbg_label.text = "READY 1"; dbg_label.position = Vector2(30, 35); dbg_label.scale = Vector2(3, 3); dbg_label.add_theme_color_override("font_color", Color(1, 1, 0)); hud.add_child(dbg_label)
+	#if OS.has_feature("web"): JavaScriptBridge.eval("alert('GAME READY START')")
+	var dbg = ColorRect.new(); dbg.color = Color(1, 0, 0, 1); dbg.position = Vector2(10, 10); dbg.size = Vector2(500, 120); hud.add_child(dbg); var dbg_label = Label.new(); dbg_label.text = "READY 1"; dbg_label.position = Vector2(30, 35); dbg_label.scale = Vector2(3, 3); dbg_label.add_theme_color_override("font_color", Color(1, 1, 0)); hud.add_child(dbg_label)
 	#var dbg = ColorRect.new(); dbg.color = Color(1, 0, 0, 1); dbg.position = Vector2(20, 20); dbg.size = Vector2(260, 60); hud.add_child(dbg); var dbg_label = Label.new(); dbg_label.text = "READY 1"; dbg_label.position = Vector2(30, 30); hud.add_child(dbg_label)
 	add_to_group("game")
 	records_ctrl.hud = hud
@@ -57,15 +57,15 @@ func _ready():
 	player_ctrl.game_over_triggered.connect(_on_player_game_over)
 	player_ctrl.next_room_requested.connect(func(): _start_room(room_num + 1))
 	weapons.player_lane = player_ctrl.player_lane
-	#dbg.color = Color(1, 0.5, 0, 1); dbg_label.text = "READY 2"
+	dbg.color = Color(1, 0.5, 0, 1); dbg_label.text = "READY 2"
 	_init_grid()
 	_draw_background()
 	if OS.has_feature("web"): JavaScriptBridge.eval("alert('AFTER DRAW')")
-	#dbg.color = Color(1, 1, 0, 1); dbg_label.text = "READY 3"
+	dbg.color = Color(1, 1, 0, 1); dbg_label.text = "READY 3"
 	#_start_room(1)
 	hud.update_weapons(active_weapons)
 	hud.update_xp(xp, xp_needed, hero_level)
-	#dbg.color = Color(0, 0.8, 0, 1); dbg_label.text = "READY OK"
+	dbg.color = Color(0, 0.8, 0, 1); dbg_label.text = "READY OK"
 
 # ── Grille ───────────────────────────────────────────────────────
 func _init_grid():
