@@ -39,7 +39,8 @@ var gem_scene = preload("res://scenes/gem.tscn")
 # ═════════════════════════════════════════════════════════════════
 func _ready():
 	#var dbg = ColorRect.new(); dbg.color = Color(1, 0, 0, 1); dbg.position = Vector2(20, 20); dbg.size = Vector2(140, 40); add_child(dbg)
-	var dbg = ColorRect.new(); dbg.color = Color(1, 0, 0, 1); dbg.position = Vector2(20, 20); dbg.size = Vector2(260, 60); hud.add_child(dbg); var dbg_label = Label.new(); dbg_label.text = "READY 1"; dbg_label.position = Vector2(30, 30); hud.add_child(dbg_label)
+	var dbg = ColorRect.new(); dbg.color = Color(1, 0, 0, 1); dbg.position = Vector2(10, 10); dbg.size = Vector2(500, 120); hud.add_child(dbg); var dbg_label = Label.new(); dbg_label.text = "READY 1"; dbg_label.position = Vector2(30, 35); dbg_label.scale = Vector2(3, 3); dbg_label.add_theme_color_override("font_color", Color(1, 1, 0)); hud.add_child(dbg_label)
+	#var dbg = ColorRect.new(); dbg.color = Color(1, 0, 0, 1); dbg.position = Vector2(20, 20); dbg.size = Vector2(260, 60); hud.add_child(dbg); var dbg_label = Label.new(); dbg_label.text = "READY 1"; dbg_label.position = Vector2(30, 30); hud.add_child(dbg_label)
 	add_to_group("game")
 	records_ctrl.hud = hud
 	records_ctrl.load_records()
