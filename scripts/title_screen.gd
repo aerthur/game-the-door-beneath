@@ -84,7 +84,7 @@ func _update_best_score():
 		best_score_label.text = ""
 
 func _on_nouvelle_partie_pressed():
-	btn_new_game.text = "CLICK OK";title_label.text = "TITLE DEBUG OK";sub_label.text = "LE CODE MODIFIE TOURNE";await; get_tree().create_timer(2.0).timeout
+	btn_new_game.text = "CLICK OK";title_label.text = "TITLE DEBUG OK";sub_label.text = "LE CODE MODIFIE TOURNE";await get_tree().create_timer(2.0).timeout
 	get_tree().change_scene_to_file("res://scenes/main.tscn")
 
 func _on_meilleurs_scores_pressed():
