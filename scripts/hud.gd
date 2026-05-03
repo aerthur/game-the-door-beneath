@@ -19,6 +19,8 @@ extends CanvasLayer
 @onready var portrait_warning : Control = $PortraitWarning
 
 var _current_choices : Array = []
+# true uniquement sur écran tactile (mobile) — false sur navigateur desktop
+var _touch_enabled   : bool  = false
 
 func _ready():
 	door_hint.visible   = false
@@ -26,6 +28,11 @@ func _ready():
 	go_panel.visible    = false
 	btn_next_room.visible = false
 	version_label.text  = "v" + ProjectSettings.get_setting("application/config/version", "0.1.0")
+
+	# Boutons tactiles : visibles uniquement sur appareils à écran tactile.
+	# Sur navigateur desktop ou version native PC, on les masque (trop grands, inutiles).
+	_touch_enabled = DisplayServer.is_touchscreen_available()
+	touch_buttons.visible = _touch_enabled
 
 	var sword_lbl = Label.new()
 	sword_lbl.name = "WeaponIcon"
@@ -99,6 +106,9 @@ func update_weapons(weapons: Array):
 
 # ── Orientation mobile ───────────────────────────────────────────
 func _check_orientation() -> void:
+	if not _touch_enabled:
+		portrait_warning.visible = false
+		return
 	var size := get_viewport().get_visible_rect().size
 	portrait_warning.visible = size.y > size.x
 
@@ -124,7 +134,8 @@ func _on_touch_next_room() -> void:
 # ── Porte ────────────────────────────────────────────────────────
 func show_door():
 	door_hint.visible = true
-	btn_next_room.visible = true
+	# BtnNextRoom uniquement sur tactile (masqué sur desktop — on utilise ESPACE)
+	btn_next_room.visible = _touch_enabled
 
 func hide_door():
 	door_hint.visible = false
