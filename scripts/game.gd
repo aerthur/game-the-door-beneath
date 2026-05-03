@@ -38,6 +38,11 @@ var gem_scene = preload("res://scenes/gem.tscn")
 
 # ═════════════════════════════════════════════════════════════════
 func _ready():
+	#OS.alert("ready call OK")
+	#var r = ColorRect.new(); r.color = Color(1,0,0,1); r.position = Vector2(40,40); r.size = Vector2(500,200); hud.add_child(r); var lbl = Label.new(); lbl.text = "HUD DEBUG OK"; lbl.position = Vector2(60,100); lbl.scale = Vector2(4,4); lbl.add_theme_color_override("font_color", Color(1,1,0)); hud.add_child(lbl)
+	#if OS.has_feature("web"): JavaScriptBridge.eval("alert('GAME READY START')")
+	#var dbg = ColorRect.new(); dbg.color = Color(1, 0, 0, 1); dbg.position = Vector2(10, 10); dbg.size = Vector2(500, 120); hud.add_child(dbg); var dbg_label = Label.new(); dbg_label.text = "READY 1"; dbg_label.position = Vector2(30, 35); dbg_label.scale = Vector2(3, 3); dbg_label.add_theme_color_override("font_color", Color(1, 1, 0)); hud.add_child(dbg_label)
+	#var dbg = ColorRect.new(); dbg.color = Color(1, 0, 0, 1); dbg.position = Vector2(20, 20); dbg.size = Vector2(260, 60); hud.add_child(dbg); var dbg_label = Label.new(); dbg_label.text = "READY 1"; dbg_label.position = Vector2(30, 30); hud.add_child(dbg_label)
 	add_to_group("game")
 	records_ctrl.hud = hud
 	records_ctrl.load_records()
@@ -54,11 +59,15 @@ func _ready():
 	player_ctrl.game_over_triggered.connect(_on_player_game_over)
 	player_ctrl.next_room_requested.connect(func(): _start_room(room_num + 1))
 	weapons.player_lane = player_ctrl.player_lane
+	#dbg.color = Color(1, 0.5, 0, 1); dbg_label.text = "READY 2"
 	_init_grid()
 	_draw_background()
+	#if OS.has_feature("web"): JavaScriptBridge.eval("alert('AFTER DRAW')")
+	#dbg.color = Color(1, 1, 0, 1); dbg_label.text = "READY 3"
 	_start_room(1)
 	hud.update_weapons(active_weapons)
 	hud.update_xp(xp, xp_needed, hero_level)
+	#dbg.color = Color(0, 0.8, 0, 1); dbg_label.text = "READY OK"
 
 # ── Grille ───────────────────────────────────────────────────────
 func _init_grid():
@@ -130,13 +139,13 @@ func _start_room(num: int):
 	hud.update_room(room_num)
 	hud.hide_door()
 
+	enemies.clear_pending_respawns()
 	if room_num % 5 == 0:
 		monsters_remaining = enemies.spawn_boss(room_num)
 	else:
 		var composition = enemies.get_composition(num)
-		monsters_remaining = composition.size()
-		print("[SALLE %d] Démarrage — %d monstres — composition: %s" % [num, monsters_remaining, composition])
-		enemies.spawn_wave(composition)
+		monsters_remaining = enemies.spawn_wave(composition)
+		print("[SALLE %d] Démarrage — %d/%d monstres spawnés — composition: %s" % [num, monsters_remaining, composition.size(), composition])
 
 # ── Boucle ───────────────────────────────────────────────────────
 func _process(delta: float):
@@ -193,31 +202,40 @@ func _do_tick():
 					m.grid_lane = l
 					var tw = create_tween()
 					tw.tween_property(m, "position", grid_pos(new_row, l), 0.25)
+	# Traitement des respawns en attente après les déplacements
+	_execute_respawn_results(enemies.tick_pending_respawns())
 
-func _on_monster_escaped(lane: int, mtype: String):
-	spawns_in_flight += 1
-	var before = monsters_remaining
-	monsters_remaining += 1
-
-	var s1 = enemies.spawn_monster(mtype, { "entry_side": "top", "entry_index": lane })
-	if not s1:
-		monsters_remaining -= 1
-		print("[ESCAPE] File %d type=%s — spawn1 RATÉ — remaining: %d→%d" % [lane+1, mtype, before, monsters_remaining])
-	else:
-		print("[ESCAPE] File %d type=%s — spawn1 ok — remaining: %d→%d" % [lane+1, mtype, before, monsters_remaining])
-
-	await get_tree().create_timer(0.35).timeout
-
-	if not game_over:
-		var s2 = enemies.spawn_monster(mtype, { "entry_side": "top", "entry_index": lane })
-		if not s2:
-			monsters_remaining -= 1
-			print("[ESCAPE] File %d type=%s — spawn2 RATÉ — remaining: %d" % [lane+1, mtype, monsters_remaining])
+func _on_monster_escaped(lane: int, mtype: String) -> void:
+	# Le monstre original est parti → -1
+	monsters_remaining -= 1
+	# Multiplication x2 : 2 remplaçants pré-comptés (+1 chacun)
+	# Net par évasion = -1 + 2 = +1 (1→2, 2→4, etc.)
+	# Si un spawn échoue/abandonne → _execute_respawn_results le décrémente
+	for _i in 2:
+		spawns_in_flight   += 1
+		monsters_remaining += 1
+		if enemies.try_spawn_preferred(mtype, lane):
+			spawns_in_flight -= 1
+			print("[ESCAPE] File %d type=%s — spawn immédiat — remaining: %d" % [lane+1, mtype, monsters_remaining])
 		else:
-			print("[ESCAPE] File %d type=%s — spawn2 ok — remaining: %d" % [lane+1, mtype, monsters_remaining])
+			enemies.queue_respawn(lane, mtype)
+			print("[ESCAPE] File %d type=%s — spawn différé (retry %d ticks) — remaining: %d" % [lane+1, mtype, GameData.TICKS_PER_SECOND, monsters_remaining])
 
-	spawns_in_flight -= 1
-	_check_room_clear()
+# Exécute les actions retournées par enemies.tick_pending_respawns().
+func _execute_respawn_results(results: Array) -> void:
+	for r in results:
+		spawns_in_flight -= 1
+		if r["action"] == "spawn":
+			var ok: bool = enemies.spawn_at(r["mtype"], 0, r["lane"])
+			if not ok:
+				monsters_remaining -= 1
+				print("[RESPAWN] File %d type=%s → spawn échoué — remaining: %d" % [r["preferred_lane"]+1, r["mtype"], monsters_remaining])
+			else:
+				print("[RESPAWN] File %d type=%s → %s lane %d — remaining: %d" % [r["preferred_lane"]+1, r["mtype"], r["status"], r["lane"]+1, monsters_remaining])
+		else:  # abandon
+			monsters_remaining -= 1
+			print("[RESPAWN] File %d type=%s → abandonné — remaining: %d" % [r["preferred_lane"]+1, r["mtype"], monsters_remaining])
+		_check_room_clear()
 
 # ── Combat ───────────────────────────────────────────────────────
 func _deal_and_check(m: Node2D, _row: int, _lane: int, dmg: int):

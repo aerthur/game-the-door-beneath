@@ -275,6 +275,26 @@ Ne pas se fier uniquement à `monsters_remaining` (peut dériver avec les corout
 
 ## Systèmes
 
+### Politique de respawn prioritaire (issue #70)
+
+Quand un monstre quitte la grille par le bas, `game.gd._on_monster_escaped()` tente de le respawn sur sa **file d'origine** (lane d'où il est sorti). Si la cellule d'entrée (row 0) est temporairement occupée ou bloquée, le système ne bascule **pas** immédiatement vers une file adjacente.
+
+**Cycle de retry :**
+1. Tentative immédiate sur la file d'origine uniquement (`enemies.try_spawn_preferred`)
+2. Si échec → création d'un **respawn en attente** (`enemies.queue_respawn`)
+3. À chaque tick suivant : retry automatique via `enemies.tick_pending_respawns()`
+4. Dès que la cellule d'entrée devient libre dans la fenêtre → spawn sur la file d'origine
+5. Après **12 ticks** (1 seconde à 12 tps) sans succès → fallback vers les files adjacentes (ordre déterministe : offsets `[+1, -1, +2, -2, ...]`)
+6. Si aucune file adjacente valide → abandon (décrémentation de `monsters_remaining`)
+
+**Décision via `get_respawn_lane(preferred, ticks_waited, max_ticks)`** — méthode pure, testable sans scène. Retourne `lane >= 0`, `RESPAWN_KEEP_WAITING (-1)`, ou `RESPAWN_GIVE_UP (-2)`.
+
+`tick_pending_respawns()` retourne des **actions** (`{action, mtype, lane?, preferred_lane}`) sans spawner de scène — `game.gd._execute_respawn_results()` les exécute. Cela maintient la séparation logique/visuel et permet les tests unitaires.
+
+**`spawns_in_flight`** reste incrémenté pendant toute la durée d'un respawn en attente, empêchant un room-clear prématuré.
+
+Tests : `test/unit/test_spawn_fallback.gd` — sections `get_respawn_lane` et `tick_pending_respawns`.
+
 ### Système d'or (issue #29)
 
 Parallèle à l'XP. Variables dans `game.gd` : `gold_current`, `gold_total_earned`, `gold_spent`.
