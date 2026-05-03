@@ -1,36 +1,36 @@
-[gd_scene load_steps=9 format=3]
+[gd_scene format=3 uid="uid://jc6uk834hlg0"]
 
-[ext_resource type="Script" path="res://scripts/game.gd" id="1"]
+[ext_resource type="Script" uid="uid://cf0bxu330uvc6" path="res://scripts/game.gd" id="1"]
 [ext_resource type="PackedScene" path="res://scenes/player.tscn" id="2"]
 [ext_resource type="PackedScene" path="res://scenes/ui/hud.tscn" id="3"]
-[ext_resource type="Script" path="res://scripts/game_visuals.gd" id="4"]
-[ext_resource type="Script" path="res://scripts/game_enemies.gd" id="5"]
-[ext_resource type="Script" path="res://scripts/game_weapons.gd" id="6"]
-[ext_resource type="Script" path="res://scripts/game_player.gd" id="7"]
-[ext_resource type="Script" path="res://scripts/game_records.gd" id="8"]
+[ext_resource type="Script" uid="uid://dc21oqrq0p0a6" path="res://scripts/game_visuals.gd" id="4"]
+[ext_resource type="Script" uid="uid://yi1ng0vt627x" path="res://scripts/game_enemies.gd" id="5"]
+[ext_resource type="Script" uid="uid://bblml24trf57g" path="res://scripts/game_weapons.gd" id="6"]
+[ext_resource type="Script" uid="uid://df6x73wp015rr" path="res://scripts/game_player.gd" id="7"]
+[ext_resource type="Script" uid="uid://c5yej58rqcqpx" path="res://scripts/game_records.gd" id="8"]
 
-[node name="Main" type="Node"]
+[node name="Main" type="Node" unique_id=827126189]
 script = ExtResource("1")
 
-[node name="Background" type="Node2D" parent="."]
+[node name="Background" type="Node2D" parent="." unique_id=1213715499]
 
-[node name="Monsters" type="Node2D" parent="."]
+[node name="Monsters" type="Node2D" parent="." unique_id=289361991]
 
-[node name="Visuals" type="Node2D" parent="."]
+[node name="Visuals" type="Node2D" parent="." unique_id=901649515]
 script = ExtResource("4")
 
-[node name="Enemies" type="Node2D" parent="."]
+[node name="Enemies" type="Node2D" parent="." unique_id=1136158035]
 script = ExtResource("5")
 
-[node name="Weapons" type="Node2D" parent="."]
+[node name="Weapons" type="Node2D" parent="." unique_id=1176905341]
 script = ExtResource("6")
 
-[node name="PlayerCtrl" type="Node2D" parent="."]
+[node name="PlayerCtrl" type="Node2D" parent="." unique_id=826708203]
 script = ExtResource("7")
 
-[node name="Records" type="Node2D" parent="."]
+[node name="Records" type="Node2D" parent="." unique_id=2047803481]
 script = ExtResource("8")
 
-[node name="Player" parent="." instance=ExtResource("2")]
+[node name="Player" parent="." unique_id=1635419548 instance=ExtResource("2")]
 
-[node name="HUD" parent="." instance=ExtResource("3")]
+[node name="HUD" parent="." unique_id=828083220 instance=ExtResource("3")]

@@ -82,13 +82,19 @@ func _resolve_spawn_ctx(ctx: Dictionary) -> Dictionary:
 		_:        return { "row": 0, "lane": index }  # "top" par défaut
 
 # ── Vague de monstres ────────────────────────────────────────────
-func spawn_wave(composition: Array):
+# Retourne le nombre de monstres effectivement spawnés.
+# Peut être < composition.size() si toutes les colonnes sont pleines
+# (ex: 7 monstres pour 5 colonnes → 2 refusés, monsters_remaining correct).
+func spawn_wave(composition: Array) -> int:
 	var lanes_list = range(BoardGeometry.GRID_COLUMNS)
 	lanes_list.shuffle()
+	var spawned : int = 0
 	for i in composition.size():
 		var lane = lanes_list[i % BoardGeometry.GRID_COLUMNS]
 		var ctx  = { "entry_side": "top", "entry_index": lane }
-		spawn_monster(composition[i], ctx)
+		if spawn_monster(composition[i], ctx):
+			spawned += 1
+	return spawned
 
 # spawn_monster — data-driven et contextuel
 # monster_id : clé dans GameData.MONSTER_DEFS
@@ -187,7 +193,10 @@ func tick_pending_respawns() -> Array:
 # Spawn sur une cellule exacte (row, lane), sans recherche de lane alternative.
 func spawn_at(monster_id: String, row: int, lane: int) -> bool:
 	if not GameData.MONSTER_DEFS.has(monster_id): return false
-	var def := GameData.MONSTER_DEFS[monster_id]
+	# Refus si la case est déjà occupée — évite les monstres orphelins
+	if not board_state.is_cell_free(row, lane) or board_state.is_cell_blocked(row, lane):
+		return false
+	var def: Dictionary = GameData.MONSTER_DEFS[monster_id]
 	var m   = _get_scene(def["scene"]).instantiate()
 	m.setup_from_def(monster_id, def)
 	monsters_node.add_child(m)

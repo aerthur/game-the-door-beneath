@@ -15,15 +15,15 @@ config/version="0.1.0"
 run/main_scene="res://scenes/title_screen.tscn"
 config/features=PackedStringArray("4.6", "Forward Plus")
 
-[editor_plugins]
-
-enabled=PackedStringArray("res://addons/gut/plugin.cfg")
-
 [display]
 
 window/size/viewport_width=1280
 window/size/viewport_height=720
 window/handheld/orientation="landscape"
+
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/gut/plugin.cfg")
 
 [input]
 
