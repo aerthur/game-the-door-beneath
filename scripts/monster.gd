@@ -14,6 +14,7 @@ var is_boss              : bool = false
 var grid_row             : int = 0
 var grid_lane            : int = 0
 var behavior             : String = "standard"
+var obstacle_behaviors   : Array = [ObstacleBehavior.WAIT]
 var palette              : Dictionary = {}
 var tags                 : Array = []
 
@@ -43,9 +44,10 @@ func setup_from_def(monster_id: String, def: Dictionary) -> void:
 	damage       = def["damage"]
 	move_speed   = def["move_speed"]
 	xp_value     = def["xp_value"]
-	is_boss      = def.get("is_boss", false)
-	behavior     = def.get("behavior", "standard")
-	tags         = def.get("tags", []).duplicate()
+	is_boss             = def.get("is_boss", false)
+	behavior            = def.get("behavior", "standard")
+	obstacle_behaviors  = def.get("obstacle_behaviors", [ObstacleBehavior.WAIT]).duplicate()
+	tags                = def.get("tags", []).duplicate()
 	# Conversion move_speed → période en ticks (12 tps)
 	# move_speed 1 → 12 ticks/move (1 case/s) ; move_speed 2 → 6 ticks/move (2 cases/s)
 	move_period_ticks    = max(1, GameData.TICKS_PER_SECOND / max(1, move_speed))

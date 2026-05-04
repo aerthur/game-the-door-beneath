@@ -27,11 +27,12 @@ game-the-door-beneath/
 │   └── gut/                    ← framework de tests GUT v9.6.0 (versionné dans le repo)
 ├── test/
 │   └── unit/                   ← tests unitaires GUT (prefixe test_, suffixe .gd)
-│       ├── test_board_geometry.gd  ← template de test (à dupliquer pour nouvelles features)
-│       ├── test_board_state.gd     ← occupation de cellules, obstacles, is_grid_empty
-│       ├── test_obstacle_data.gd   ← factory make_wall, obstacles destructibles, blocage
-│       ├── test_monster_stats.gd   ← constantes GameData, conversion ticks, scaling boss
-│       └── test_spawn_fallback.gd  ← _resolve_spawn_ctx, find_spawn_lane, retry/fallback
+│       ├── test_board_geometry.gd    ← template de test (à dupliquer pour nouvelles features)
+│       ├── test_board_state.gd       ← occupation de cellules, obstacles, is_grid_empty
+│       ├── test_obstacle_data.gd     ← factory make_wall, obstacles destructibles, blocage
+│       ├── test_monster_stats.gd     ← constantes GameData, conversion ticks, scaling boss
+│       ├── test_spawn_fallback.gd    ← _resolve_spawn_ctx, find_spawn_lane, retry/fallback
+│       └── test_monster_behaviors.gd ← ObstacleBehavior.resolve(), wait/sidestep, priorité, déterminisme
 ├── scenes/
 │   ├── title_screen.tscn       ← scène principale au démarrage (menu + meilleurs scores)
 │   ├── main.tscn               ← scène de jeu (lancée depuis title_screen)
@@ -43,6 +44,7 @@ game-the-door-beneath/
 │       └── hud.tscn            ← CanvasLayer UI (HP, XP, armes, level-up, game over)
 └── scripts/
     ├── obstacle_data.gd        ← class_name ObstacleData (structure de données obstacles)
+    ├── obstacle_behavior.gd    ← class_name ObstacleBehavior (résolveur pur de comportements d'obstacle)
     ├── title_screen.gd         ← menu principal + affichage meilleurs scores
     ├── game.gd                 ← coordinateur principal (état, tick, room)
     ├── game_constants.gd       ← class_name GameData (ROOM_WAVES, WEAPON_DEFS, MONSTER_DEFS, LORE_TEXTS)
@@ -274,6 +276,49 @@ Ne pas se fier uniquement à `monsters_remaining` (peut dériver avec les corout
 ---
 
 ## Systèmes
+
+### Comportements de résolution d'obstacle (issue #72)
+
+Quand un monstre tente d'avancer vers `new_row = r + 1` mais que la cellule est bloquée ou occupée, il choisit une action parmi ses **comportements autorisés** définis dans `MONSTER_DEFS["obstacle_behaviors"]`.
+
+**Priorité** : l'avancée directe est toujours tentée en premier. Si elle réussit, aucun comportement d'obstacle n'est consulté.
+
+**Résolveur** : `ObstacleBehavior.resolve(behaviors, row, lane, board_state, rng_seed)` — fonction statique pure, testable sans scène. Retourne `{"action": "wait"}` ou `{"action": "move", "row": r, "lane": l}`.
+
+**Comportements supportés** :
+
+| Identifiant | Constante | Comportement |
+|---|---|---|
+| `"wait"` | `ObstacleBehavior.WAIT` | Reste en place ce tick |
+| `"sidestep_left"` | `ObstacleBehavior.SIDESTEP_LEFT` | Se déplace latéralement vers `lane - 1` (même rangée) |
+| `"sidestep_right"` | `ObstacleBehavior.SIDESTEP_RIGHT` | Se déplace latéralement vers `lane + 1` (même rangée) |
+| `"sidestep_random"` | `ObstacleBehavior.SIDESTEP_RANDOM` | Choisit gauche ou droite selon `rng_seed % 2` (déterministe) |
+| `"jump_obstacle"` | `ObstacleBehavior.JUMP_OBSTACLE` | **Réservé** — logique multi-ticks à concevoir |
+| `"destroy_obstacle"` | `ObstacleBehavior.DESTROY_OBSTACLE` | **Réservé** — requiert obstacle destructible actif |
+
+**Règles de sélection** : le premier comportement de la liste dont la cellule cible est valide est retenu. Si aucun comportement n'est valide (ou si la liste est vide), l'action est `"wait"`.
+
+**Règle d'échec** : si la cible d'un sidestep est occupée ou bloquée au moment du test, le comportement est invalide pour ce tick. Le monstre réévaluera au tick suivant.
+
+**Anti-double-mouvement** : `game.gd._do_tick()` maintient un dictionnaire `moved_this_tick` qui empêche un monstre ayant sidestepped (vers une lane non encore traitée) d'être traité une deuxième fois dans le même tick.
+
+**rng_seed déterministe** : calculé comme `row * GRID_COLUMNS + lane` — un monstre à la même position produit toujours le même choix, compatible simulation 12 tps.
+
+**Profils par monstre dans MONSTER_DEFS** :
+
+| Monstre | `obstacle_behaviors` | Raisonnement |
+|---|---|---|
+| Gobelin vert (`"g"`) | `[WAIT]` | Simple, reste bloqué |
+| Gobelin bleu (`"b"`) | `[SIDESTEP_LEFT, SIDESTEP_RIGHT, WAIT]` | Rusé, essaie les deux côtés |
+| Gobelin rouge (`"r"`) | `[SIDESTEP_RANDOM, WAIT]` | Agressif, contourne aléatoirement |
+| Boss (`"boss_*"`) | `[WAIT]` | Tient sa lane, ne se déplace pas latéralement |
+
+**Fichiers concernés** :
+- `scripts/obstacle_behavior.gd` — résolveur pur (`class_name ObstacleBehavior`)
+- `scripts/game_constants.gd` — champ `obstacle_behaviors` dans chaque entrée de `MONSTER_DEFS`
+- `scripts/monster.gd` — variable `obstacle_behaviors`, chargée dans `setup_from_def()`
+- `scripts/game.gd` — intégration dans `_do_tick()` + `moved_this_tick`
+- `test/unit/test_monster_behaviors.gd` — tests unitaires GUT
 
 ### Politique de respawn prioritaire (issue #70)
 
@@ -675,11 +720,12 @@ Ce pack fournit un **filet de sécurité minimal** avant le refacto structurel p
 ### Comment étendre ce pack
 
 Pour de futurs tickets :
-1. **Comportements monstres** (`on_tick()` overrides) → `test_monster_behaviors.gd`
+1. **Comportements monstres** (`on_tick()` overrides) → étendre `test_monster_behaviors.gd` (issue #72 couvre déjà `ObstacleBehavior.resolve`)
 2. **Scaling des armes** (formule `base_dmg * (1 + (level-1) * 0.5)`) → `test_weapon_scaling.gd`
 3. **Records et persistance** (mock du filesystem) → `test_game_records.gd`
 4. **Spawn contextuel multi-côté** (quand `player_side` sera implémenté) → étendre `test_spawn_fallback.gd`
 5. **Obstacles destructibles en jeu** (intégration `BoardState` + `deal_fn`) → `test/integration/`
+6. **jump_obstacle** (multi-ticks) → `ObstacleBehavior.JUMP_OBSTACLE` est réservé, à implémenter dans `obstacle_behavior.gd`
 
 ### Relancer le pack
 
