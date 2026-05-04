@@ -166,10 +166,15 @@ func _process(delta: float):
 
 # ── Tick ─────────────────────────────────────────────────────────
 func _do_tick():
+	# Prévient les doubles mouvements : un monstre ayant sidestepped dans ce tick
+	# ne doit pas être traité à nouveau quand la boucle atteint sa nouvelle position.
+	var moved_this_tick : Dictionary = {}
+
 	for r in range(BoardGeometry.GRID_ROWS - 1, -1, -1):
 		for l in range(BoardGeometry.GRID_COLUMNS):
 			var m = board_state.get_cell_occupant(r, l)
 			if m == null: continue
+			if moved_this_tick.has(m): continue
 			m.tick_freeze()
 			if m.frozen_ticks > 0: continue
 			m.move_countdown_ticks -= 1
@@ -202,6 +207,21 @@ func _do_tick():
 					m.grid_lane = l
 					var tw = create_tween()
 					tw.tween_property(m, "position", grid_pos(new_row, l), 0.25)
+				else:
+					# Avancée directe impossible → résolution de comportement d'obstacle
+					var rng_seed = r * BoardGeometry.GRID_COLUMNS + l
+					var action = ObstacleBehavior.resolve(m.obstacle_behaviors, r, l, board_state, rng_seed)
+					if action["action"] == "move":
+						var dst_lane : int = action["lane"]
+						var dst_row  : int = action["row"]
+						moved_this_tick[m] = true
+						board_state.set_cell_occupied(dst_row, dst_lane, m)
+						board_state.clear_cell(r, l)
+						m.grid_row  = dst_row
+						m.grid_lane = dst_lane
+						var tw = create_tween()
+						tw.tween_property(m, "position", grid_pos(dst_row, dst_lane), 0.25)
+					# else: "wait" — pas de mouvement ce tick
 	# Traitement des respawns en attente après les déplacements
 	_execute_respawn_results(enemies.tick_pending_respawns())
 
