@@ -185,7 +185,7 @@ func test_tick_pending_fallback_after_12_ticks_integrated() -> void:
 	_state.set_cell_occupied(0, 2, "m")
 	_enemies.queue_respawn(2, "g")
 	var results_before: Array = []
-	for _i in range(11):
+	for _i in range(12):
 		results_before = _enemies.tick_pending_respawns()
 		assert_eq(results_before.size(), 0, "dans la fenêtre → pas d'action")
 	# 12ème tick → fallback
