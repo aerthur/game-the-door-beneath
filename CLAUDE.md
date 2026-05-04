@@ -437,7 +437,7 @@ TopBar (PanelContainer, pleine largeur)
         └── [cartes armes ajoutées dynamiquement par update_weapons()]
 ```
 
-**Cartes armes** (créées dans `update_weapons()`) : PanelContainer 72px min, VBox avec HBox(icône emoji + "Nom Nv.X") + barre de cooldown 5px.
+**Cartes armes** (créées dans `update_weapons()`) : PanelContainer 72px min, VBox avec HBox(icône + "Nom Nv.X") + barre de cooldown 5px. L'icône est un TextureRect 22×22 si `icon_path` est renseigné, sinon un Label emoji 16px (fallback).
 
 **Cooldown live** : `hud.gd._process()` lit passivement `_game_ref.active_weapons[i].acc` chaque frame (lazy init de `_game_ref` via `get_first_node_in_group("game")`). Deux StyleBoxFlat pré-construits (`_cd_fill_charging` = C_GOLD_DIM, `_cd_fill_ready` = C_GOLD) swappés uniquement au franchissement du seuil 0.88 pour éviter les allocations par frame.
 
@@ -460,7 +460,7 @@ hud.show_game_over(gold: int, room: int)
 
 Chaque arme dans `GameData.WEAPON_DEFS` a un champ `"icon"` (emoji fallback) et `"icon_path"` (texture PNG).
 Toutes les armes ont un `icon_path` pointant vers `res://assets/weapons/<id>.png` (PNG 48×48 pixel-art issu du design system).
-Affichées dans les cartes armes de la TopBar : emoji 16px si `icon_path` est vide, sinon TextureRect 48px.
+Affichées partout (TopBar + panel level-up) : TextureRect si `icon_path` est renseigné (22×22 dans la TopBar, 48×48 dans le panel level-up), sinon emoji fallback.
 
 ### Animation de porte + XP fin de salle (issue #20)
 
