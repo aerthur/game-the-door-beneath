@@ -96,13 +96,6 @@ func _draw_background():
 			cell.size     = Vector2(BoardGeometry.CELL_WIDTH - 2, BoardGeometry.CELL_HEIGHT - 2)
 			cell.color    = Color(0.13, 0.10, 0.08) if (r + l) % 2 == 0 else Color(0.11, 0.09, 0.07)
 			bg.add_child(cell)
-	for l in BoardGeometry.GRID_COLUMNS:
-		var lbl = Label.new()
-		lbl.text = "F%d" % (l + 1)
-		lbl.position = Vector2(BoardGeometry.GRID_ORIGIN_X + l * BoardGeometry.CELL_WIDTH + BoardGeometry.CELL_WIDTH * 0.5 - 10,
-							   BoardGeometry.GRID_ORIGIN_Y + BoardGeometry.GRID_ROWS * BoardGeometry.CELL_HEIGHT + 4)
-		lbl.add_theme_color_override("font_color", Color(0.45, 0.45, 0.45))
-		bg.add_child(lbl)
 	_draw_obstacles()
 
 # Dessine les obstacles de test comme overlays sur les cellules concernées.

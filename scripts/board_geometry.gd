@@ -4,10 +4,10 @@ class_name BoardGeometry
 const GRID_COLUMNS  = 5
 const GRID_ROWS     = 8
 const CELL_WIDTH    = 180
-const CELL_HEIGHT   = 68
+const CELL_HEIGHT   = 56
 const GRID_ORIGIN_X = (1280 - GRID_COLUMNS * CELL_WIDTH) / 2   # 140
-const GRID_ORIGIN_Y = 30
-const PLAYER_Y      = GRID_ORIGIN_Y + GRID_ROWS * CELL_HEIGHT + 24  # 598
+const GRID_ORIGIN_Y = 115
+const PLAYER_Y      = GRID_ORIGIN_Y + GRID_ROWS * CELL_HEIGHT + 40  # 603
 
 # ── Helpers grille ↔ monde ────────────────────────────────────────
 
