@@ -68,6 +68,11 @@ custom_minimum_size = Vector2(0, 8)
 layout_mode = 2
 alignment = 1
 
+[node name="BtnContinuer" type="Button" parent="UI/Center/TitlePanel/MenuBox"]
+layout_mode = 2
+text = "Continuer"
+disabled = true
+
 [node name="Sep0" type="Label" parent="UI/Center/TitlePanel/MenuBox"]
 layout_mode = 2
 text = "— ✦ —"
@@ -82,11 +87,31 @@ layout_mode = 2
 text = "— ✦ —"
 horizontal_alignment = 1
 
+[node name="BtnMulti" type="Button" parent="UI/Center/TitlePanel/MenuBox"]
+layout_mode = 2
+text = "Multijoueur"
+disabled = true
+
+[node name="Sep2" type="Label" parent="UI/Center/TitlePanel/MenuBox"]
+layout_mode = 2
+text = "— ✦ —"
+horizontal_alignment = 1
+
 [node name="BtnScores" type="Button" parent="UI/Center/TitlePanel/MenuBox"]
 layout_mode = 2
 text = "Meilleurs Scores"
 
-[node name="Sep2" type="Label" parent="UI/Center/TitlePanel/MenuBox"]
+[node name="Sep3" type="Label" parent="UI/Center/TitlePanel/MenuBox"]
+layout_mode = 2
+text = "— ✦ —"
+horizontal_alignment = 1
+
+[node name="BtnOptions" type="Button" parent="UI/Center/TitlePanel/MenuBox"]
+layout_mode = 2
+text = "Options"
+disabled = true
+
+[node name="Sep4" type="Label" parent="UI/Center/TitlePanel/MenuBox"]
 layout_mode = 2
 text = "— ✦ —"
 horizontal_alignment = 1

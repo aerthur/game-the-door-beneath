@@ -60,11 +60,12 @@ func _draw_stone_grid():
 	for row in 11:
 		for col in 17:
 			var rect = ColorRect.new()
-			var b = rng.randf_range(0.035, 0.072)
-			# Teinte chaude sombre (tons marron-pierre)
+			# Variation très faible : tuiles quasi-invisibles, fond uniforme #07070e
+			var b = rng.randf_range(0.026, 0.031)
 			rect.color = Color(b * 1.05, b * 0.8, b * 0.55, 1.0)
+			# Pas de gap : tuiles jointives → pas de grille visible
 			rect.position = Vector2(col * 76, row * 68)
-			rect.size     = Vector2(74, 66)
+			rect.size     = Vector2(76, 68)
 			stone_node.add_child(rect)
 
 # ── Styles ────────────────────────────────────────────────────────
@@ -98,15 +99,26 @@ func _style_ui():
 	lbl_ben.add_theme_color_override("font_color", C_GOLD_DIM)
 
 	# ── Séparateurs "— ✦ —" ──
-	for sep_path in ["Sep0", "Sep1", "Sep2"]:
+	for sep_path in ["Sep0", "Sep1", "Sep2", "Sep3", "Sep4"]:
 		var sep_lbl : Label = $UI/Center/TitlePanel/MenuBox.get_node(sep_path)
 		sep_lbl.add_theme_font_override("font", serif)
 		sep_lbl.add_theme_font_size_override("font_size", 11)
 		sep_lbl.add_theme_color_override("font_color", C_GOLD_DIM)
 
-	# ── Boutons fantôme ──
+	# ── Boutons actifs ──
 	_style_ghost_button(btn_new_game, serif, C_TEXT, 13)
 	_style_ghost_button(btn_scores,   serif, C_TEXT, 13)
+
+	# ── Boutons grisés (désactivés) ──
+	var C_DISABLED := Color(C_TEXT_DIM.r, C_TEXT_DIM.g, C_TEXT_DIM.b, 0.38)
+	for btn_path in ["BtnContinuer", "BtnMulti", "BtnOptions"]:
+		var btn_dis : Button = $UI/Center/TitlePanel/MenuBox.get_node(btn_path)
+		_style_ghost_button(btn_dis, serif, C_DISABLED, 13)
+		# Écraser hover/pressed pour ne montrer aucun effet (bouton inactif)
+		btn_dis.add_theme_stylebox_override("hover",   StyleBoxEmpty.new())
+		btn_dis.add_theme_stylebox_override("pressed", StyleBoxEmpty.new())
+		btn_dis.add_theme_color_override("font_hover_color",   C_DISABLED)
+		btn_dis.add_theme_color_override("font_pressed_color", C_DISABLED)
 
 	# ── Meilleur score (bas de page) ──
 	best_score_label.add_theme_font_override("font", serif)
