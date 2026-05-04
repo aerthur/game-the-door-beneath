@@ -55,6 +55,8 @@ func setup_from_def(monster_id: String, def: Dictionary) -> void:
 	if def.has("palette"):
 		palette = def["palette"].duplicate()
 		apply_palette(palette)
+	if def.has("sprite_path"):
+		_apply_sprite(def["sprite_path"])
 
 # Point d'extension comportement — appelé à chaque tick de mouvement.
 # Comportements spéciaux (ex: "charge", "split") surchargent cette méthode.
@@ -77,6 +79,11 @@ func apply_palette(palette: Dictionary) -> void:
 	for node_name in ["EyeLeft", "EyeRight"]:
 		var n = get_node_or_null(node_name)
 		if n: n.color = eye_c
+
+func _apply_sprite(path: String) -> void:
+	var sprite = get_node_or_null("Sprite")
+	if sprite:
+		sprite.texture = load(path)
 
 func _on_damage_taken() -> void:
 	pass

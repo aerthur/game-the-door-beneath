@@ -49,6 +49,7 @@ const MONSTER_DEFS = {
 		"xp_value":           25,
 		"is_boss":            false,
 		"tags":               [],
+		"sprite_path":        "res://assets/characters/goblin_green.svg",
 		# Comportement simple : attend quand bloqué, ne contourne pas
 		"obstacle_behaviors": [ObstacleBehavior.WAIT],
 		"palette": {
@@ -68,6 +69,7 @@ const MONSTER_DEFS = {
 		"xp_value":           50,
 		"is_boss":            false,
 		"tags":               [],
+		"sprite_path":        "res://assets/characters/goblin_blue.svg",
 		# Comportement rusé : essaie de contourner gauche puis droite avant d'attendre
 		"obstacle_behaviors": [ObstacleBehavior.SIDESTEP_LEFT, ObstacleBehavior.SIDESTEP_RIGHT, ObstacleBehavior.WAIT],
 		"palette": {
@@ -87,6 +89,7 @@ const MONSTER_DEFS = {
 		"xp_value":           100,
 		"is_boss":            false,
 		"tags":               [],
+		"sprite_path":        "res://assets/characters/goblin_red.svg",
 		# Comportement agressif : contourne aléatoirement, ne reste jamais bloqué longtemps
 		"obstacle_behaviors": [ObstacleBehavior.SIDESTEP_RANDOM, ObstacleBehavior.WAIT],
 		"palette": {
@@ -109,6 +112,7 @@ const MONSTER_DEFS = {
 		"is_boss":            true,
 		"monster_type":       "g",
 		"tags":               ["boss"],
+		"sprite_path":        "res://assets/characters/boss_green.svg",
 		# Les boss tiennent leur lane, ne se déplacent pas latéralement
 		"obstacle_behaviors": [ObstacleBehavior.WAIT],
 		"palette": {
@@ -129,6 +133,7 @@ const MONSTER_DEFS = {
 		"is_boss":            true,
 		"monster_type":       "b",
 		"tags":               ["boss"],
+		"sprite_path":        "res://assets/characters/boss_blue.svg",
 		"obstacle_behaviors": [ObstacleBehavior.WAIT],
 		"palette": {
 			"main": Color(0.22, 0.35, 0.75),
@@ -148,6 +153,7 @@ const MONSTER_DEFS = {
 		"is_boss":            true,
 		"monster_type":       "r",
 		"tags":               ["boss"],
+		"sprite_path":        "res://assets/characters/boss_red.svg",
 		"obstacle_behaviors": [ObstacleBehavior.WAIT],
 		"palette": {
 			"main": Color(0.75, 0.18, 0.12),
@@ -160,12 +166,12 @@ const MONSTER_DEFS = {
 
 # ── Définitions des armes ────────────────────────────────────────
 const WEAPON_DEFS = {
-	"arc":        {"name": "Arc",        "base_dmg": 25, "cd": 1.0,  "desc": "1 ennemi dans la file active",       "icon": "🏹", "icon_path": ""},
-	"arbalete":   {"name": "Arbalète",   "base_dmg": 55, "cd": 2.0,  "desc": "Perce 2 ennemis dans la file",       "icon": "🎯", "icon_path": ""},
-	"dague":      {"name": "Dague",      "base_dmg": 10, "cd": 0.35, "desc": "Très rapide, file active",           "icon": "🗡️", "icon_path": ""},
-	"bombe":      {"name": "Bombe",      "base_dmg": 20, "cd": 2.5,  "desc": "Explose sur 3 files voisines",       "icon": "💣", "icon_path": ""},
-	"eclair":     {"name": "Eclair",     "base_dmg": 16, "cd": 1.5,  "desc": "Frappe tous les ennemis de la file", "icon": "⚡", "icon_path": ""},
-	"tourbillon": {"name": "Tourbillon", "base_dmg": 12, "cd": 2.0,  "desc": "1ère rangée de chaque file",         "icon": "🌀", "icon_path": ""},
-	"givre":      {"name": "Givre",      "base_dmg": 8,  "cd": 1.5,  "desc": "Ralentit l'ennemi 2s + dégâts",      "icon": "❄️", "icon_path": ""},
-	"sismique":   {"name": "Sismique",   "base_dmg": 9,  "cd": 3.0,  "desc": "2 dernières rangées, toutes files",  "icon": "🪨", "icon_path": ""},
+	"arc":        {"name": "Arc",        "base_dmg": 25, "cd": 1.0,  "desc": "1 ennemi dans la file active",       "icon": "🏹", "icon_path": "res://assets/weapons/arc.png"},
+	"arbalete":   {"name": "Arbalète",   "base_dmg": 55, "cd": 2.0,  "desc": "Perce 2 ennemis dans la file",       "icon": "🎯", "icon_path": "res://assets/weapons/arbalete.png"},
+	"dague":      {"name": "Dague",      "base_dmg": 10, "cd": 0.35, "desc": "Très rapide, file active",           "icon": "🗡️", "icon_path": "res://assets/weapons/dague.png"},
+	"bombe":      {"name": "Bombe",      "base_dmg": 20, "cd": 2.5,  "desc": "Explose sur 3 files voisines",       "icon": "💣", "icon_path": "res://assets/weapons/bombe.png"},
+	"eclair":     {"name": "Eclair",     "base_dmg": 16, "cd": 1.5,  "desc": "Frappe tous les ennemis de la file", "icon": "⚡", "icon_path": "res://assets/weapons/eclair.png"},
+	"tourbillon": {"name": "Tourbillon", "base_dmg": 12, "cd": 2.0,  "desc": "1ère rangée de chaque file",         "icon": "🌀", "icon_path": "res://assets/weapons/tourbillon.png"},
+	"givre":      {"name": "Givre",      "base_dmg": 8,  "cd": 1.5,  "desc": "Ralentit l'ennemi 2s + dégâts",      "icon": "❄️", "icon_path": "res://assets/weapons/givre.png"},
+	"sismique":   {"name": "Sismique",   "base_dmg": 9,  "cd": 3.0,  "desc": "2 dernières rangées, toutes files",  "icon": "🪨", "icon_path": "res://assets/weapons/sismique.png"},
 }
