@@ -156,10 +156,18 @@ func update_weapons(weapons: Array):
 		hb.add_theme_constant_override("separation", 4)
 		vb.add_child(hb)
 
-		var icon_lbl = Label.new()
-		icon_lbl.text = icon_str
-		icon_lbl.add_theme_font_size_override("font_size", 16)
-		hb.add_child(icon_lbl)
+		var icon_path : String = def.get("icon_path", "")
+		if icon_path != "":
+			var tex_rect = TextureRect.new()
+			tex_rect.custom_minimum_size = Vector2(22, 22)
+			tex_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			tex_rect.texture = load(icon_path)
+			hb.add_child(tex_rect)
+		else:
+			var icon_lbl = Label.new()
+			icon_lbl.text = icon_str
+			icon_lbl.add_theme_font_size_override("font_size", 16)
+			hb.add_child(icon_lbl)
 
 		var name_lbl = Label.new()
 		name_lbl.text = "%s  Nv.%d" % [def.name, w.level]
