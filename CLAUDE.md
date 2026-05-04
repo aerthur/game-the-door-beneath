@@ -45,7 +45,8 @@ game-the-door-beneath/
 └── scripts/
     ├── obstacle_data.gd        ← class_name ObstacleData (structure de données obstacles)
     ├── obstacle_behavior.gd    ← class_name ObstacleBehavior (résolveur pur de comportements d'obstacle)
-    ├── title_screen.gd         ← menu principal + affichage meilleurs scores
+    ├── title_screen.gd         ← menu principal + affichage meilleurs scores (design dark fantasy)
+    ├── door_drawing.gd         ← Control custom : porte gothique SVG dessinée via _draw()
     ├── game.gd                 ← coordinateur principal (état, tick, room)
     ├── game_constants.gd       ← class_name GameData (ROOM_WAVES, WEAPON_DEFS, MONSTER_DEFS, LORE_TEXTS)
     ├── board_geometry.gd       ← class_name BoardGeometry (géométrie grille 5×8, helpers statiques)
@@ -273,6 +274,22 @@ L'occupation de la grille est gérée exclusivement par `board_state` (instance 
 La salle est terminée quand `_grid_empty() == true AND spawns_in_flight == 0`.
 Ne pas se fier uniquement à `monsters_remaining` (peut dériver avec les coroutines async).
 
+**Comptabilité `monsters_remaining` (bug corrigé) :** `_on_monster_escaped()` doit décrémenter **avant** d'incrémenter pour les remplaçants, sinon le compteur gonfle sans fin :
+
+```gdscript
+func _on_monster_escaped(lane: int, mtype: String) -> void:
+    monsters_remaining -= 1          # ← CRITIQUE : décrémenter d'abord
+    for _i in 2:
+        spawns_in_flight   += 1
+        monsters_remaining += 1
+        if enemies.try_spawn_preferred(mtype, lane):
+            spawns_in_flight -= 1
+        else:
+            enemies.queue_respawn(lane, mtype)
+```
+
+**`spawn_wave` retourne le nombre réel de spawns :** aux salles avec plus de 5 monstres (5 lanes), certains échouent. `monsters_remaining = enemies.spawn_wave(composition)` reçoit le compte réel, pas `composition.size()`. Signature : `func spawn_wave(composition: Array) -> int`.
+
 ---
 
 ## Systèmes
@@ -459,10 +476,72 @@ Trois boutons sont intégrés en bas de l'écran dans `hud.tscn` (`TouchButtons`
 ### Architecture d'input unifiée
 Les boutons tactiles réutilisent les **actions Godot canoniques** (`lane_left`, `lane_right`, `next_room`) via `Input.parse_input_event(InputEventAction)`. Le flux est identique au clavier : les événements transitent par `game.gd._input()` → `game_player.handle_input()`. Il n'existe qu'un seul chemin de contrôle.
 
+### Détection desktop vs mobile
+`hud.gd` utilise `DisplayServer.is_touchscreen_available()` dans `_ready()` pour initialiser `_touch_enabled`. Sur desktop/web PC, `_touch_enabled = false` → `touch_buttons.visible = false` dès le départ. Sur mobile, les boutons sont visibles et les actions utilisent `Input.parse_input_event(InputEventAction)` pour réutiliser les actions Godot canoniques.
+
+`show_door()` respecte `_touch_enabled` : `btn_next_room.visible = _touch_enabled` — le bouton "Salle suivante" n'apparaît que sur mobile même quand la salle est vidée.
+
 ### Fichiers concernés
 - `project.godot` — orientation paysage forcée
 - `scenes/ui/hud.tscn` — nœuds `TouchButtons` et `PortraitWarning`
-- `scripts/hud.gd` — `_check_orientation()`, `_on_touch_left/right/next_room()`
+- `scripts/hud.gd` — `_touch_enabled`, `_check_orientation()`, `_on_touch_left/right/next_room()`
+
+## Design du menu principal (title_screen)
+
+### Palette dark fantasy
+
+| Token | Constante GDScript | Hex | Usage |
+|---|---|---|---|
+| Fond | `C_BG` | `#07070e` | `ColorRect` de fond |
+| Or | `C_GOLD` | `#b89a4e` | Hover boutons, titre du panel scores |
+| Or atténué | `C_GOLD_DIM` | `#6b5a28` | Séparateurs, "T H E", "B E N E A T H", bordure porte |
+| Texte | `C_TEXT` | `#cfc8b8` | "DOOR", boutons actifs |
+| Texte dim | `C_TEXT_DIM` | `#7a7060` | Sous-titre, best score, boutons désactivés |
+| Pierre | `C_STONE` | `#0c0906` | (référence) |
+
+### Arbre UI (title_screen.tscn)
+
+```
+TitleScreen (Node + title_screen.gd)
+├── Background (ColorRect, C_BG, z=-10)
+├── StoneGrid (Node2D, z=-9)          ← tuiles jointives quasi-invisibles
+└── UI (CanvasLayer)
+    ├── Center (CenterContainer, full-screen)
+    │   └── TitlePanel (VBoxContainer)
+    │       ├── SubtitleLabel    "Un jeu de dark fantasy"
+    │       ├── TitleBox (VBox)
+    │       │   ├── TheLabel     "T H E"
+    │       │   ├── DoorLabel    "DOOR"  (72px)
+    │       │   └── BeneathLabel "B E N E A T H"
+    │       ├── DoorControl (Control + door_drawing.gd, 110×140)
+    │       └── MenuBox (VBox)
+    │           ├── BtnContinuer  (disabled)   ← grisé, non-cliquable
+    │           ├── Sep0 "— ✦ —"
+    │           ├── BtnNewGame                 ← actif
+    │           ├── Sep1 "— ✦ —"
+    │           ├── BtnMulti     (disabled)    ← grisé
+    │           ├── Sep2 "— ✦ —"
+    │           ├── BtnScores                  ← actif
+    │           ├── Sep3 "— ✦ —"
+    │           ├── BtnOptions   (disabled)    ← grisé
+    │           └── Sep4 "— ✦ —"
+    ├── BestScoreLabel (ancré bas, C_TEXT_DIM)
+    └── ScoresPanel (overlay records, caché par défaut)
+```
+
+### Porte gothique (door_drawing.gd)
+
+`door_drawing.gd` étend `Control` et dessine entièrement dans `_draw()` (aucune texture externe). Coordonnées converties depuis un SVG viewBox `(-8,-6 176×254)` via `_s(x,y)` → écran `90×130`. Éléments dessinés : arche extérieure (bezier quadratique), panneaux gauche/droit (fond sombre), encadrements décoratifs, fente centrale, poignées, serrure.
+
+### Grille de pierres
+
+Tuiles `ColorRect` jointives (76×68 px, pas de gap), variation de luminosité très faible (`0.026–0.031`). L'effet est une texture de fond quasi-uniforme sans quadrillage perceptible.
+
+### Boutons ghost
+
+`_style_ghost_button(btn, font, col, size)` : fond transparent (`StyleBoxEmpty`), hover = `bg` très léger + bordure dorée basse de 1px, texte en serif. Boutons désactivés : même style mais couleur `C_TEXT_DIM` à 38% d'opacité, hover/pressed overridés avec `StyleBoxEmpty` pour rester totalement inertes.
+
+---
 
 ## Export HTML5 et preview par PR (issue #93)
 
