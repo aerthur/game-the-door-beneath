@@ -159,8 +159,10 @@ func update_weapons(weapons: Array):
 		var icon_path : String = def.get("icon_path", "")
 		if icon_path != "":
 			var tex_rect = TextureRect.new()
-			tex_rect.custom_minimum_size = Vector2(22, 22)
+			tex_rect.custom_minimum_size = Vector2(16, 16)
+			tex_rect.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 			tex_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			tex_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 			tex_rect.texture = load(icon_path)
 			hb.add_child(tex_rect)
 		else:
