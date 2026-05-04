@@ -17,12 +17,18 @@ func test_move_period_speed2_equals_6_ticks() -> void:
 
 func test_all_monster_defs_have_required_fields() -> void:
 	var required := ["name", "scene", "behavior", "hp", "damage", "move_speed",
-					 "xp_value", "is_boss", "tags", "palette"]
+					 "xp_value", "is_boss", "tags", "palette", "sprite_path"]
 	for monster_id: String in GameData.MONSTER_DEFS:
 		var def: Dictionary = GameData.MONSTER_DEFS[monster_id]
 		for field: String in required:
 			assert_true(def.has(field),
 				"MONSTER_DEFS['%s'] doit avoir le champ '%s'" % [monster_id, field])
+
+func test_all_monster_defs_sprite_path_nonempty() -> void:
+	for monster_id: String in GameData.MONSTER_DEFS:
+		var path: String = GameData.MONSTER_DEFS[monster_id].get("sprite_path", "")
+		assert_true(path.begins_with("res://assets/characters/"),
+			"MONSTER_DEFS['%s'].sprite_path doit pointer vers res://assets/characters/" % monster_id)
 
 func test_all_monster_defs_hp_positive() -> void:
 	for monster_id: String in GameData.MONSTER_DEFS:
@@ -58,12 +64,18 @@ func test_boss_monster_type_matches_base() -> void:
 	assert_eq(GameData.MONSTER_DEFS["boss_r"]["monster_type"], "r", "boss_r → monster_type 'r'")
 
 func test_all_weapon_defs_have_required_fields() -> void:
-	var required := ["name", "base_dmg", "cd", "desc", "icon"]
+	var required := ["name", "base_dmg", "cd", "desc", "icon", "icon_path"]
 	for weapon_id: String in GameData.WEAPON_DEFS:
 		var def: Dictionary = GameData.WEAPON_DEFS[weapon_id]
 		for field: String in required:
 			assert_true(def.has(field),
 				"WEAPON_DEFS['%s'] doit avoir le champ '%s'" % [weapon_id, field])
+
+func test_all_weapon_defs_icon_path_nonempty() -> void:
+	for weapon_id: String in GameData.WEAPON_DEFS:
+		var path: String = GameData.WEAPON_DEFS[weapon_id].get("icon_path", "")
+		assert_true(path.begins_with("res://assets/weapons/"),
+			"WEAPON_DEFS['%s'].icon_path doit pointer vers res://assets/weapons/" % weapon_id)
 
 func test_all_weapon_defs_base_dmg_positive() -> void:
 	for weapon_id: String in GameData.WEAPON_DEFS:

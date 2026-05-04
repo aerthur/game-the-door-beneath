@@ -22,7 +22,20 @@ game-the-door-beneath/
 ├── .github/
 │   └── workflows/
 │       ├── gut-tests.yml       ← CI GitHub Actions (GUT sur tous push/PR)
-│       └── html5-preview.yml   ← export HTML5 + déploiement preview par PR
+│       ├── html5-preview.yml   ← export HTML5 + déploiement preview par PR
+│       └── main-deploy.yml     ← tests GUT + deploy HTML5 sur push vers main (URL stable)
+├── assets/
+│   ├── characters/             ← sprites SVG des personnages (archer + gobelins + boss)
+│   │   ├── archer.svg          ← joueur (viewBox 40×52)
+│   │   ├── goblin_green.svg    ← gobelin vert (viewBox 36×48)
+│   │   ├── goblin_blue.svg     ← gobelin bleu (viewBox 36×48)
+│   │   ├── goblin_red.svg      ← gobelin rouge (viewBox 36×48)
+│   │   ├── boss_green.svg      ← boss vert (viewBox 52×64)
+│   │   ├── boss_blue.svg       ← boss bleu (viewBox 52×64)
+│   │   └── boss_red.svg        ← boss rouge (viewBox 52×64)
+│   └── weapons/                ← icônes PNG pixel-art des 8 armes (48×48)
+│       ├── arc.png  arbalete.png  dague.png  bombe.png
+│       └── eclair.png  tourbillon.png  givre.png  sismique.png
 ├── addons/
 │   └── gut/                    ← framework de tests GUT v9.6.0 (versionné dans le repo)
 ├── test/
@@ -36,9 +49,9 @@ game-the-door-beneath/
 ├── scenes/
 │   ├── title_screen.tscn       ← scène principale au démarrage (menu + meilleurs scores)
 │   ├── main.tscn               ← scène de jeu (lancée depuis title_screen)
-│   ├── player.tscn             ← archer joueur (Node2D + polygones)
-│   ├── monster_base.tscn       ← scène réutilisable pour tous les gobelins (palette appliquée au runtime)
-│   ├── monster_boss.tscn       ← boss (2× visuel, couronne, barre de vie)
+│   ├── player.tscn             ← archer joueur (Node2D + Sprite2D ; texture chargée par player.gd)
+│   ├── monster_base.tscn       ← scène réutilisable pour tous les gobelins (Sprite2D, texture chargée via sprite_path)
+│   ├── monster_boss.tscn       ← boss (Sprite2D 1.3×, couronne Label, barre de vie ProgressBar)
 │   ├── gem.tscn                ← gemme XP (Polygon2D diamond)
 │   └── ui/
 │       └── hud.tscn            ← CanvasLayer UI (HP, XP, armes, level-up, game over)
@@ -52,6 +65,7 @@ game-the-door-beneath/
     ├── board_geometry.gd       ← class_name BoardGeometry (géométrie grille 5×8, helpers statiques)
     ├── board_state.gd          ← class_name BoardState (occupation de la grille, source de vérité)
     ├── monster.gd              ← class_name Monster (classe de base de tous les monstres)
+    ├── player.gd               ← script Player : charge archer.svg dans Sprite2D au _ready()
     ├── game_enemies.gd         ← spawn, placement, retraite des ennemis ($Enemies)
     ├── game_player.gd          ← état/input joueur ($PlayerCtrl)
     ├── game_weapons.gd         ← logique de tir des 8 armes ($Weapons)
@@ -444,8 +458,9 @@ hud.show_game_over(gold: int, room: int)
 
 ### Icônes armes (issue #9)
 
-Chaque arme dans `GameData.WEAPON_DEFS` a un champ `"icon"` (emoji) et `"icon_path"` (texture).
-Affichées dans les cartes armes de la TopBar. L'icône est affichée en emoji 16px si `icon_path` est vide, sinon en TextureRect 48px.
+Chaque arme dans `GameData.WEAPON_DEFS` a un champ `"icon"` (emoji fallback) et `"icon_path"` (texture PNG).
+Toutes les armes ont un `icon_path` pointant vers `res://assets/weapons/<id>.png` (PNG 48×48 pixel-art issu du design system).
+Affichées dans les cartes armes de la TopBar : emoji 16px si `icon_path` est vide, sinon TextureRect 48px.
 
 ### Animation de porte + XP fin de salle (issue #20)
 
@@ -666,7 +681,8 @@ Chaque entrée de `GameData.MONSTER_DEFS` doit contenir :
 | `xp_value` | int | XP accordée au kill |
 | `is_boss` | bool | Boss = true (spawner contextuel + retraite) |
 | `tags` | Array[String] | Flags optionnels (ex: ["boss", "armored"]) |
-| `palette` | Dictionary | Couleurs `main/dark/nose/eye` (appliquées par `monster.gd`) |
+| `sprite_path` | String (res://) | Chemin vers le SVG dans `res://assets/characters/` — chargé par `monster.gd._apply_sprite()` |
+| `palette` | Dictionary | Couleurs `main/dark/nose/eye` (utilisées pour effets de modulation — flash dégâts, teinte givre) |
 | `monster_type` | String (optionnel) | Type de base pour records (boss uniquement ; ex: boss_g → "g") |
 
 Le spawn est **entièrement data-driven** : `game_enemies._get_scene(def["scene"])` charge et cache la scène automatiquement — aucun preload à ajouter dans `game_enemies.gd`.
