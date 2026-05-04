@@ -201,16 +201,22 @@ Factory disponible : `ObstacleData.make_wall()` → mur indestructible bloquant 
 BoardGeometry.GRID_COLUMNS   # 5
 BoardGeometry.GRID_ROWS      # 8
 BoardGeometry.CELL_WIDTH     # 180
-BoardGeometry.CELL_HEIGHT    # 68
+BoardGeometry.CELL_HEIGHT    # 56
 BoardGeometry.GRID_ORIGIN_X  # 140  — (1280 - 5*180) / 2
-BoardGeometry.GRID_ORIGIN_Y  # 30
-BoardGeometry.PLAYER_Y       # 598  — bas de grille + 24
+BoardGeometry.GRID_ORIGIN_Y  # 115
+BoardGeometry.PLAYER_Y       # 603  — bas de grille + 40
 
 BoardGeometry.get_cell_center(row, col) -> Vector2
 BoardGeometry.cell_to_world(row, col)   -> Vector2
 BoardGeometry.world_to_cell(pos)        -> Vector2i
 BoardGeometry.is_valid_cell(row, col)   -> bool
 ```
+
+**Marges verticales** (écran 1280×720, TopBar 50px, XPZone à y=668) :
+- Au-dessus de la grille (TopBar → row 0) : **65 px**
+- En dessous du joueur (PLAYER_Y → XPZone) : **65 px**
+- Sur les côtés (GRID_ORIGIN_X) : **140 px** de chaque côté
+- Ces marges sont conçues pour permettre à terme un déplacement périmétrique du joueur autour de la grille (haut / bas / gauche / droite).
 
 ### Monster — classe de base
 
@@ -385,10 +391,61 @@ Pendant `_play_door_animation()`, `_show_lore_text(room_num)` tourne en coroutin
 Timing : fade in 0.3s → affiché 2.5s → fade out 0.3s = 3.1s total.
 Visuel : `RichTextLabel` BBCode `[center][i]...[/i][/center]`, fond `ColorRect` semi-transparent.
 
+### Design system HUD in-game
+
+Le HUD (`scripts/hud.gd` + `scenes/ui/hud.tscn`) utilise la même palette dark fantasy que le menu principal.
+
+**Palette (tokens identiques à `title_screen.gd`) :**
+
+| Token | Constante | Hex |
+|---|---|---|
+| Fond | `C_BG` | `#07070e` |
+| Or | `C_GOLD` | `#b89a4e` |
+| Or atténué | `C_GOLD_DIM` | `#6b5a28` |
+| Texte | `C_TEXT` | `#cfc8b8` |
+| Texte dim | `C_TEXT_DIM` | `#7a7060` |
+| Pierre | `C_STONE` | `#0c0906` |
+| HP fill | `C_HP_FILL` | `#991e1e` |
+| XP fill | `C_XP_FILL` | `#6f561f` |
+
+**Layout TopBar** (`offset_bottom = 50`) — basé sur un `Control` avec ancres indépendantes (pas un HBoxContainer) pour garantir le centrage pixel-perfect de la zone info :
+
+```
+TopBar (PanelContainer, pleine largeur)
+└── Layout (Control)
+    ├── HPZone (VBoxContainer, ancrée gauche, offset_right=250)
+    │   ├── HPLabel  "❤  100 / 100"
+    │   └── HPBar    (ProgressBar 18px)
+    ├── InfoZone (VBoxContainer, ancres 0→1 pleine largeur, mouse_filter=PASS)
+    │   ├── RoomLabel  "Salle N"     (horizontal_alignment=CENTER)
+    │   └── ScoreLabel "💰 Or : N"  (horizontal_alignment=CENTER)
+    └── WeaponRow (HBoxContainer, ancrée droite, offset_left=-420)
+        └── [cartes armes ajoutées dynamiquement par update_weapons()]
+```
+
+**Cartes armes** (créées dans `update_weapons()`) : PanelContainer 72px min, VBox avec HBox(icône emoji + "Nom Nv.X") + barre de cooldown 5px.
+
+**Cooldown live** : `hud.gd._process()` lit passivement `_game_ref.active_weapons[i].acc` chaque frame (lazy init de `_game_ref` via `get_first_node_in_group("game")`). Deux StyleBoxFlat pré-construits (`_cd_fill_charging` = C_GOLD_DIM, `_cd_fill_ready` = C_GOLD) swappés uniquement au franchissement du seuil 0.88 pour éviter les allocations par frame.
+
+**API HUD (signatures inchangées vis-à-vis de game.gd / game_player.gd) :**
+```gdscript
+hud.update_health(cur: int, mx: int)
+hud.update_room(n: int)
+hud.update_gold(n: int)
+hud.update_lane(_n: int)      # ← no-op (label file supprimé de l'UI)
+hud.update_xp(cur: int, needed: int, lv: int)
+hud.update_weapons(weapons: Array)
+hud.show_door() / hide_door()
+hud.show_level_up(choices: Array) / hide_level_up()
+hud.show_game_over(gold: int, room: int)
+```
+
+> ⚠️ `update_lane()` est conservé pour compatibilité avec `game_player.gd` mais ne met plus rien à jour visuellement (`pass`). Ne pas réintroduire un `LaneLabel` sans mettre à jour les deux fichiers.
+
 ### Icônes armes (issue #9)
 
 Chaque arme dans `GameData.WEAPON_DEFS` a un champ `"icon"` (emoji) et `"icon_path"` (texture).
-Affichées dans le panel armes du HUD. L'icône ⚜️ survit aux updates de la liste.
+Affichées dans les cartes armes de la TopBar. L'icône est affichée en emoji 16px si `icon_path` est vide, sinon en TextureRect 48px.
 
 ### Animation de porte + XP fin de salle (issue #20)
 
@@ -483,7 +540,7 @@ Les boutons tactiles réutilisent les **actions Godot canoniques** (`lane_left`,
 
 ### Fichiers concernés
 - `project.godot` — orientation paysage forcée
-- `scenes/ui/hud.tscn` — nœuds `TouchButtons` et `PortraitWarning`
+- `scenes/ui/hud.tscn` — nœuds `TouchButtons` et `PortraitWarning` (sous `Layout` → séparés de la TopBar)
 - `scripts/hud.gd` — `_touch_enabled`, `_check_orientation()`, `_on_touch_left/right/next_room()`
 
 ## Design du menu principal (title_screen)
