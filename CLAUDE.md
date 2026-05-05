@@ -567,6 +567,39 @@ Variables d'état dans `hud.gd` :
 - `_levelup_selected_idx` — index de la carte actuellement mise en évidence
 - `_levelup_cards` — tableau de références aux `PanelContainer` des cartes (rempli dans `show_level_up()`)
 
+### Chaînage multi-niveaux simultanés
+
+Quand un seul appel à `_add_xp()` franchit plusieurs seuils (ex. jackpot XP fin de salle), les panels level-up sont enchaînés automatiquement.
+
+**Mécanique** (`game.gd`) :
+
+```gdscript
+# _add_xp() — boucle while au lieu de if
+while xp >= xp_needed:
+    xp -= xp_needed
+    xp_needed = int(xp_needed * 1.55)
+    hero_level += 1
+    _pending_levelups += 1
+if _pending_levelups > 0 and not leveling_up:
+    _trigger_level_up()
+
+# apply_level_up_choice() — enchaîne ou termine
+_pending_levelups -= 1
+if _pending_levelups > 0:
+    hud.show_level_up(_generate_choices())  # panel suivant, jeu toujours en pause
+else:
+    hud.hide_level_up()
+    leveling_up = false
+```
+
+**Cas des gemmes async** : les gemmes se déplacent via `tween` (indépendant de `_process`) et peuvent arriver pendant qu'un panel est affiché. Si une gemme déclenche un nouveau niveau pendant le choix, `_pending_levelups` s'incrémente et le niveau sera proposé à la suite — `leveling_up` reste `true` pendant toute la chaîne.
+
+Variables d'état dans `game.gd` :
+- `_pending_levelups` — nombre de niveaux en attente de résolution
+- `leveling_up` — reste `true` pendant toute la chaîne, bloque `_process`
+
+**Slot debug** : touche `D` dans `game.gd._input()` (commentée) — décommenter `_add_xp(500)` pour tester le chaînage en partie.
+
 ---
 
 ## Les 8 armes (Mode Lanes)
