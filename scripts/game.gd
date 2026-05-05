@@ -15,7 +15,8 @@ var monsters_remaining : int = 0
 var spawns_in_flight   : int = 0   # nb de _on_monster_escaped en cours (async)
 var room_clear  : bool = false
 var game_over   : bool = false
-var leveling_up : bool = false
+var leveling_up       : bool = false
+var _pending_levelups : int  = 0   # niveau-ups en attente de résolution (jackpot multi-niveaux)
 
 var active_weapons : Array = [{"id": "arc", "level": 1, "acc": 0.0}]
 var board_state : BoardState = BoardState.new()
@@ -443,14 +444,20 @@ func _collect_gem(g: Node2D):
 # ── XP & Niveau ──────────────────────────────────────────────────
 func _add_xp(amount: int):
 	xp += amount
-	if xp >= xp_needed:
-		xp -= xp_needed
-		xp_needed = int(xp_needed * 1.55)
+	# Boucle : un seul appel peut franchir plusieurs seuils (jackpot multi-niveaux)
+	var newly_leveled : int = 0
+	while xp >= xp_needed:
+		xp         -= xp_needed
+		xp_needed   = int(xp_needed * 1.55)
 		hero_level += 1
-		hud.update_xp(xp, xp_needed, hero_level)
-		_trigger_level_up()
-	else:
-		hud.update_xp(xp, xp_needed, hero_level)
+		newly_leveled += 1
+	hud.update_xp(xp, xp_needed, hero_level)
+	if newly_leveled > 0:
+		_pending_levelups += newly_leveled
+		# Si un panel est déjà affiché (leveling_up), apply_level_up_choice
+		# continuera la chaîne — on n'ouvre pas un second panneau ici.
+		if not leveling_up:
+			_trigger_level_up()
 
 func _trigger_level_up():
 	leveling_up = true
@@ -481,8 +488,13 @@ func apply_level_up_choice(choice: Dictionary):
 				w.level += 1
 				break
 	hud.update_weapons(active_weapons)
-	hud.hide_level_up()
-	leveling_up = false
+	_pending_levelups -= 1
+	if _pending_levelups > 0:
+		# Niveaux suivants en attente : enchaîner le prochain panel sans quitter le mode pause
+		hud.show_level_up(_generate_choices())
+	else:
+		hud.hide_level_up()
+		leveling_up = false
 
 # ── Game Over ────────────────────────────────────────────────────
 func _on_player_game_over():
