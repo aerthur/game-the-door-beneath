@@ -24,7 +24,9 @@ extends CanvasLayer
 @onready var btn_next_room    : Button   = $TouchButtons/BtnNextRoom
 @onready var portrait_warning : Control  = $PortraitWarning
 
-var _current_choices : Array = []
+var _current_choices      : Array = []
+var _levelup_selected_idx : int   = 0   # index de la carte actuellement mise en évidence
+var _levelup_cards        : Array = []  # références aux PanelContainer des cartes
 var _touch_enabled   : bool  = false
 var _serif           : Font  = null    # police serif partagée
 
@@ -234,8 +236,10 @@ func hide_door():
 
 # ── Level up ─────────────────────────────────────────────────────
 func show_level_up(choices: Array):
-	_current_choices = choices
-	lvlup_panel.visible = true
+	_current_choices      = choices
+	_levelup_selected_idx = 0
+	_levelup_cards.clear()
+	lvlup_panel.visible   = true
 
 	for child in lvlup_hbox.get_children():
 		child.queue_free()
@@ -318,14 +322,17 @@ func show_level_up(choices: Array):
 		vb.add_child(dmg_lbl)
 
 		var btn = Button.new()
-		btn.text = "Choisir  [ %d ]" % (i + 1)
+		btn.text = "Choisir"
 		btn.pressed.connect(_on_choice_selected.bind(i))
 		if _serif:
 			_style_ghost_btn(btn, _serif, C_TEXT, 12)
 		btn.custom_minimum_size = Vector2(0, 30)
 		vb.add_child(btn)
 
+		_levelup_cards.append(card)
 		lvlup_hbox.add_child(card)
+
+	_update_levelup_highlight()
 
 func _on_choice_selected(index: int):
 	if index < 0 or index >= _current_choices.size(): return
@@ -335,14 +342,30 @@ func _on_choice_selected(index: int):
 func hide_level_up():
 	lvlup_panel.visible = false
 
-# ── Sélection clavier du level-up (touches 1 / 2 / 3) ───────────
+# Met en évidence la carte sélectionnée (bordure or vif) et atténue les autres.
+func _update_levelup_highlight() -> void:
+	for i in _levelup_cards.size():
+		var card = _levelup_cards[i]
+		if not is_instance_valid(card): continue
+		var selected : bool = (i == _levelup_selected_idx)
+		card.add_theme_stylebox_override("panel", _make_panel_style(
+			Color(0.047, 0.035, 0.024, 0.97),
+			C_GOLD if selected else C_GOLD_DIM,
+			12))
+
+# ── Sélection clavier du level-up (← → pour naviguer, Entrée/Espace pour choisir)
 func _unhandled_input(event: InputEvent) -> void:
 	if not lvlup_panel.visible: return
-	if not (event is InputEventKey) or not event.pressed or event.echo: return
-	match event.keycode:
-		KEY_1: _on_choice_selected(0)
-		KEY_2: _on_choice_selected(1)
-		KEY_3: _on_choice_selected(2)
+	if not event.is_pressed() or event.is_echo(): return
+	if event.is_action("lane_left"):
+		_levelup_selected_idx = max(0, _levelup_selected_idx - 1)
+		_update_levelup_highlight()
+	elif event.is_action("lane_right"):
+		_levelup_selected_idx = mini(_current_choices.size() - 1, _levelup_selected_idx + 1)
+		_update_levelup_highlight()
+	elif event.is_action("next_room") or \
+			(event is InputEventKey and event.keycode in [KEY_ENTER, KEY_KP_ENTER]):
+		_on_choice_selected(_levelup_selected_idx)
 
 # ── Game Over ────────────────────────────────────────────────────
 func show_game_over(s: int, r: int):
