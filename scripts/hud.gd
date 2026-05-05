@@ -21,7 +21,6 @@ extends CanvasLayer
 @onready var go_panel      : Control     = $GameOver
 @onready var version_label : Label       = $VersionLabel
 @onready var touch_buttons    : Control  = $TouchButtons
-@onready var btn_next_room    : Button   = $TouchButtons/BtnNextRoom
 @onready var portrait_warning : Control  = $PortraitWarning
 
 var _current_choices      : Array = []
@@ -54,7 +53,6 @@ func _ready():
 	door_hint.visible   = false
 	lvlup_panel.visible = false
 	go_panel.visible    = false
-	btn_next_room.visible = false
 	version_label.text  = "v" + ProjectSettings.get_setting("application/config/version", "0.1.0")
 
 	_touch_enabled = DisplayServer.is_touchscreen_available()
@@ -68,15 +66,11 @@ func _ready():
 	if not btn_menu.pressed.is_connected(_on_menu_principal_pressed):
 		btn_menu.pressed.connect(_on_menu_principal_pressed)
 
-	# Contrôles tactiles
-	var btn_left  : Button = $TouchButtons/BtnLeft
-	var btn_right : Button = $TouchButtons/BtnRight
+	# Contrôles tactiles — D-pad
+	var btn_left  : Button = $TouchButtons/DPad/BtnLeft
+	var btn_right : Button = $TouchButtons/DPad/BtnRight
 	btn_left.button_down.connect(_on_touch_left)
 	btn_right.button_down.connect(_on_touch_right)
-	btn_next_room.button_down.connect(_on_touch_next_room)
-	btn_left.add_theme_font_size_override("font_size", 36)
-	btn_right.add_theme_font_size_override("font_size", 36)
-	btn_next_room.add_theme_font_size_override("font_size", 22)
 	$PortraitWarning/Panel/VBox/Icon.add_theme_font_size_override("font_size", 80)
 	$PortraitWarning/Panel/VBox/Message.add_theme_font_size_override("font_size", 26)
 
@@ -219,20 +213,12 @@ func _on_touch_right() -> void:
 	ev.pressed = true
 	Input.parse_input_event(ev)
 
-func _on_touch_next_room() -> void:
-	var ev := InputEventAction.new()
-	ev.action = "next_room"
-	ev.pressed = true
-	Input.parse_input_event(ev)
-
 # ── Porte ────────────────────────────────────────────────────────
 func show_door():
 	door_hint.visible = true
-	btn_next_room.visible = _touch_enabled
 
 func hide_door():
 	door_hint.visible = false
-	btn_next_room.visible = false
 
 # ── Level up ─────────────────────────────────────────────────────
 func show_level_up(choices: Array):
@@ -521,6 +507,9 @@ func _style_hud() -> void:
 	# ── Panel Game Over ───────────────────────────────────────────
 	_style_gameover_panel(serif)
 
+	# ── D-pad tactile ────────────────────────────────────────────
+	_style_dpad()
+
 	# ── Portrait warning (mobile) ─────────────────────────────────
 	$PortraitWarning/Panel/VBox/Icon.add_theme_color_override("font_color", C_GOLD)
 	$PortraitWarning/Panel/VBox/Message.add_theme_font_override("font", serif)
@@ -559,3 +548,47 @@ func _style_gameover_panel(serif: Font) -> void:
 
 	_style_ghost_btn($GameOver/Panel/VBox/Restart,       serif, C_TEXT,     13)
 	_style_ghost_btn($GameOver/Panel/VBox/MenuPrincipal, serif, C_TEXT_DIM, 12)
+
+
+func _style_dpad() -> void:
+	# Fond semi-transparent pour le fond du D-pad (ColorRect implicite via StyleBoxFlat)
+	var active_style := StyleBoxFlat.new()
+	active_style.bg_color           = Color(0.04, 0.03, 0.02, 0.78)
+	active_style.border_color       = C_GOLD_DIM
+	active_style.border_width_left  = 1; active_style.border_width_right  = 1
+	active_style.border_width_top   = 1; active_style.border_width_bottom = 1
+	active_style.corner_radius_top_left    = 6; active_style.corner_radius_top_right    = 6
+	active_style.corner_radius_bottom_left = 6; active_style.corner_radius_bottom_right = 6
+
+	var active_hover := active_style.duplicate()
+	active_hover.bg_color     = Color(0.08, 0.06, 0.04, 0.92)
+	active_hover.border_color = C_GOLD
+
+	var active_pressed := active_style.duplicate()
+	active_pressed.bg_color = Color(0.14, 0.10, 0.05, 0.95)
+
+	var disabled_style := StyleBoxFlat.new()
+	disabled_style.bg_color           = Color(0.04, 0.03, 0.02, 0.35)
+	disabled_style.border_color       = Color(C_GOLD_DIM.r, C_GOLD_DIM.g, C_GOLD_DIM.b, 0.3)
+	disabled_style.border_width_left  = 1; disabled_style.border_width_right  = 1
+	disabled_style.border_width_top   = 1; disabled_style.border_width_bottom = 1
+	disabled_style.corner_radius_top_left    = 6; disabled_style.corner_radius_top_right    = 6
+	disabled_style.corner_radius_bottom_left = 6; disabled_style.corner_radius_bottom_right = 6
+
+	for btn_path in ["BtnLeft", "BtnRight", "BtnUp", "BtnDown"]:
+		var btn : Button = $TouchButtons/DPad.get_node(btn_path)
+		var is_active : bool = btn_path in ["BtnLeft", "BtnRight"]
+		btn.add_theme_font_size_override("font_size", 28)
+		if is_active:
+			btn.add_theme_stylebox_override("normal",   active_style)
+			btn.add_theme_stylebox_override("hover",    active_hover)
+			btn.add_theme_stylebox_override("pressed",  active_pressed)
+			btn.add_theme_stylebox_override("focus",    active_style)
+			btn.add_theme_color_override("font_color",         C_TEXT)
+			btn.add_theme_color_override("font_hover_color",   C_GOLD)
+			btn.add_theme_color_override("font_pressed_color", C_GOLD)
+		else:
+			btn.add_theme_stylebox_override("normal",   disabled_style)
+			btn.add_theme_stylebox_override("disabled", disabled_style)
+			btn.add_theme_color_override("font_color",          Color(C_TEXT_DIM.r, C_TEXT_DIM.g, C_TEXT_DIM.b, 0.4))
+			btn.add_theme_color_override("font_disabled_color", Color(C_TEXT_DIM.r, C_TEXT_DIM.g, C_TEXT_DIM.b, 0.4))
