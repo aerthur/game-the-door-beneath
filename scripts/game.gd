@@ -225,7 +225,7 @@ func _do_tick():
 				else:
 					# Avancée directe impossible → résolution de comportement d'obstacle
 					var rng_seed = r * BoardGeometry.GRID_COLUMNS + l
-					var action = ObstacleBehavior.resolve(m.obstacle_behaviors, r, l, board_state, rng_seed)
+					var action = ObstacleBehavior.resolve(m.obstacle_behaviors, r, l, board_state, rng_seed, m.behavior_weights)
 					if action["action"] == "move":
 						var dst_lane : int = action["lane"]
 						var dst_row  : int = action["row"]

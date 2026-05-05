@@ -343,7 +343,7 @@ Quand un monstre tente d'avancer vers `new_row = r + 1` mais que la cellule est 
 
 **Priorité** : l'avancée directe est toujours tentée en premier. Si elle réussit, aucun comportement d'obstacle n'est consulté.
 
-**Résolveur** : `ObstacleBehavior.resolve(behaviors, row, lane, board_state, rng_seed)` — fonction statique pure, testable sans scène. Retourne `{"action": "wait"}` ou `{"action": "move", "row": r, "lane": l}`.
+**Résolveur** : `ObstacleBehavior.resolve(behaviors, row, lane, board_state, rng_seed, weights)` — fonction statique pure, testable sans scène. Paramètre `weights` optionnel (défaut `{}`). Retourne `{"action": "wait"}`, `{"action": "move", "row": r, "lane": l}` ou `{"action": "jump_start", "row": r, "lane": l}`.
 
 **Comportements supportés** :
 
@@ -356,7 +356,29 @@ Quand un monstre tente d'avancer vers `new_row = r + 1` mais que la cellule est 
 | `"jump_obstacle"` | `ObstacleBehavior.JUMP_OBSTACLE` | Franchit la cellule bloquante (`row+1`) pour atterrir en `row+2` — action multi-ticks (3 move periods) |
 | `"destroy_obstacle"` | `ObstacleBehavior.DESTROY_OBSTACLE` | **Réservé** — requiert obstacle destructible actif |
 
-**Règles de sélection** : le premier comportement de la liste dont la cellule cible est valide est retenu. Si aucun comportement n'est valide (ou si la liste est vide), l'action est `"wait"`.
+**Deux modes de sélection** selon `behavior_weights` dans `MONSTER_DEFS` (issue #75) :
+
+- **`behavior_weights` vide (`{}`)** → **mode ordonné** : premier comportement valide dans la liste retenu. Adapté aux monstres mono-comportement et aux boss.
+- **`behavior_weights` non vide** → **mode pondéré** : tous les comportements valides sont collectés, puis tirage déterministe pondéré par les poids.
+
+**Règles du tirage pondéré** :
+1. Seuls les comportements valides (cellule cible accessible, dans les bornes) participent au tirage.
+2. Un seul comportement valide → retourné directement, sans tirage.
+3. Plusieurs comportements valides → tirage via `build_weight_table` + `select_from_weight_table`.
+4. Comportement absent de `behavior_weights` → **poids par défaut = 1**.
+5. Aucun comportement valide → `"wait"` (fallback explicite).
+
+**Helpers testables** (fonctions statiques pures) :
+```gdscript
+ObstacleBehavior.build_weight_table(valid_entries, weights) -> Array
+# Entrée : liste de {behavior, result} + dict de poids
+# Sortie : Array de {cumulative, entry}, poids négatif traité comme 0
+
+ObstacleBehavior.select_from_weight_table(table, rng_seed) -> Dictionary
+# pick = rng_seed % total ; si total == 0 → fallback = première entrée
+```
+
+**Règles de sélection** (mode ordonné, `weights = {}`) : le premier comportement de la liste dont la cellule cible est valide est retenu. Si aucun comportement n'est valide (ou si la liste est vide), l'action est `"wait"`.
 
 **Règle d'échec** : si la cible d'un sidestep est occupée ou bloquée au moment du test, le comportement est invalide pour ce tick. Le monstre réévaluera au tick suivant.
 
@@ -381,19 +403,19 @@ Le saut se déroule sur **3 move periods** (consommation équivalente à 3 dépl
 
 **Profils par monstre dans MONSTER_DEFS** :
 
-| Monstre | `obstacle_behaviors` | Raisonnement |
-|---|---|---|
-| Gobelin vert (`"g"`) | `[WAIT]` | Simple, reste bloqué |
-| Gobelin bleu (`"b"`) | `[SIDESTEP_LEFT, SIDESTEP_RIGHT, WAIT]` | Rusé, essaie les deux côtés |
-| Gobelin rouge (`"r"`) | `[SIDESTEP_RANDOM, JUMP_OBSTACLE, WAIT]` | Agressif : contourne aléatoirement, saute si impossible |
-| Boss (`"boss_*"`) | `[WAIT]` | Tient sa lane, ne se déplace pas latéralement |
+| Monstre | `obstacle_behaviors` | `behavior_weights` | Mode |
+|---|---|---|---|
+| Gobelin vert (`"g"`) | `[WAIT]` | `{}` | Ordonné (trivial) |
+| Gobelin bleu (`"b"`) | `[SIDESTEP_LEFT, SIDESTEP_RIGHT, WAIT]` | `{left:40, right:40, wait:20}` | Pondéré, pas de biais gauche |
+| Gobelin rouge (`"r"`) | `[SIDESTEP_RANDOM, JUMP_OBSTACLE, WAIT]` | `{random:50, jump:30, wait:20}` | Pondéré, favorise le mouvement |
+| Boss (`"boss_*"`) | `[WAIT]` | `{}` | Ordonné (tient sa lane) |
 
 **Fichiers concernés** :
-- `scripts/obstacle_behavior.gd` — résolveur pur (`class_name ObstacleBehavior`)
-- `scripts/game_constants.gd` — champ `obstacle_behaviors` dans chaque entrée de `MONSTER_DEFS`
-- `scripts/monster.gd` — variable `obstacle_behaviors`, chargée dans `setup_from_def()`
-- `scripts/game.gd` — intégration dans `_do_tick()` + `moved_this_tick`
-- `test/unit/test_monster_behaviors.gd` — tests unitaires GUT
+- `scripts/obstacle_behavior.gd` — résolveur pur + helpers `build_weight_table` / `select_from_weight_table`
+- `scripts/game_constants.gd` — champs `obstacle_behaviors` + `behavior_weights` dans `MONSTER_DEFS`
+- `scripts/monster.gd` — variable `behavior_weights`, chargée dans `setup_from_def()`
+- `scripts/game.gd` — passe `m.behavior_weights` à `resolve()` dans `_do_tick()`
+- `test/unit/test_monster_behaviors.gd` — tests unitaires GUT (comportements + sélection pondérée)
 
 ### Politique de respawn prioritaire (issue #70)
 

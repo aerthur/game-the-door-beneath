@@ -4,6 +4,8 @@ extends GutTest
 # Couvre : avancée directe libre (hors scope du résolveur), wait, sidestep_left/right/random,
 #          priorité des comportements, cas limites (bord de grille, cellule occupée/bloquée),
 #          liste vide, comportements réservés, déterminisme avec rng_seed.
+# Couvre aussi : sélection pondérée (behavior_weights), build_weight_table,
+#               select_from_weight_table, intégration MONSTER_DEFS.
 
 var _state: BoardState
 
@@ -261,3 +263,192 @@ func test_sidestep_right_valid_from_lane3() -> void:
 	var result = ObstacleBehavior.resolve([ObstacleBehavior.SIDESTEP_RIGHT], 4, last - 1, _state)
 	assert_eq(result["action"], "move",  "avant-dernière lane → sidestep_right vers dernière possible")
 	assert_eq(result["lane"],   last,    "cible = dernière lane")
+
+# ── sélection pondérée : resolve() avec weights ───────────────────
+
+func test_weighted_empty_weights_keeps_ordered_priority() -> void:
+	# Sans poids ({}), le mode ordonné est préservé : premier valide gagne
+	var result = ObstacleBehavior.resolve(
+		[ObstacleBehavior.SIDESTEP_LEFT, ObstacleBehavior.WAIT], 4, 2, _state, 0, {})
+	assert_eq(result["action"], "move", "weights vide → mode ordonné → sidestep_left gagne")
+	assert_eq(result["lane"], 1, "sidestep_left → lane 1")
+
+func test_weighted_single_valid_deterministic_regardless_of_weights() -> void:
+	# Gauche bloquée → seul wait valide ; malgré poids élevé sur sidestep_left
+	_state.set_cell_occupied(4, 1, "blocker")
+	var weights = {ObstacleBehavior.SIDESTEP_LEFT: 9999, ObstacleBehavior.WAIT: 1}
+	var result = ObstacleBehavior.resolve(
+		[ObstacleBehavior.SIDESTEP_LEFT, ObstacleBehavior.WAIT], 4, 2, _state, 0, weights)
+	assert_eq(result["action"], "wait", "seul comportement valide → déterministe, pas de tirage")
+
+func test_weighted_invalid_behavior_excluded_from_draw() -> void:
+	# sidestep_left bloqué → exclu même avec poids maximal ; seul wait peut sortir
+	_state.set_cell_occupied(4, 1, "blocker")
+	var weights = {ObstacleBehavior.SIDESTEP_LEFT: 9999, ObstacleBehavior.WAIT: 1}
+	for seed in [0, 1, 7, 13, 22, 39, 100, 999]:
+		var result = ObstacleBehavior.resolve(
+			[ObstacleBehavior.SIDESTEP_LEFT, ObstacleBehavior.WAIT], 4, 2, _state, seed, weights)
+		assert_eq(result["action"], "wait",
+			"comportement invalide jamais sélectionné (seed=%d)" % seed)
+
+func test_weighted_result_always_within_valid_set() -> void:
+	# Les deux directions libres → seules lane 1 et lane 3 peuvent sortir, jamais wait
+	var behaviors = [ObstacleBehavior.SIDESTEP_LEFT, ObstacleBehavior.SIDESTEP_RIGHT, ObstacleBehavior.WAIT]
+	var weights = {
+		ObstacleBehavior.SIDESTEP_LEFT:  50,
+		ObstacleBehavior.SIDESTEP_RIGHT: 50,
+		ObstacleBehavior.WAIT:           0,
+	}
+	for seed in range(0, 30):
+		var result = ObstacleBehavior.resolve(behaviors, 4, 2, _state, seed, weights)
+		assert_eq(result["action"], "move", "poids wait=0 → jamais wait (seed=%d)" % seed)
+		assert_true(result["lane"] == 1 or result["lane"] == 3,
+			"lane = 1 ou 3 uniquement (seed=%d)" % seed)
+
+func test_weighted_missing_weight_defaults_to_1() -> void:
+	# WAIT n'a pas de clé dans weights → poids par défaut = 1
+	# sidestep_left bloqué → seul wait reste valid
+	_state.set_cell_occupied(4, 1, "blocker")
+	var weights = {ObstacleBehavior.SIDESTEP_LEFT: 10}  # WAIT absent → défaut 1
+	var result = ObstacleBehavior.resolve(
+		[ObstacleBehavior.SIDESTEP_LEFT, ObstacleBehavior.WAIT], 4, 2, _state, 0, weights)
+	assert_eq(result["action"], "wait", "poids manquant → défaut 1 → wait valide en fallback")
+
+func test_weighted_deterministic_same_inputs() -> void:
+	var behaviors = [ObstacleBehavior.SIDESTEP_LEFT, ObstacleBehavior.SIDESTEP_RIGHT, ObstacleBehavior.WAIT]
+	var weights = {ObstacleBehavior.SIDESTEP_LEFT: 40, ObstacleBehavior.SIDESTEP_RIGHT: 40, ObstacleBehavior.WAIT: 20}
+	var r1 = ObstacleBehavior.resolve(behaviors, 4, 2, _state, 17, weights)
+	var r2 = ObstacleBehavior.resolve(behaviors, 4, 2, _state, 17, weights)
+	assert_eq(r1["action"], r2["action"], "tirage pondéré déterministe : même seed → même action")
+	if r1.has("lane"):
+		assert_eq(r1["lane"], r2["lane"], "tirage pondéré déterministe : même seed → même lane")
+
+func test_weighted_direct_advance_not_in_scope_of_resolve() -> void:
+	# resolve() n'est appelé que quand l'avancée directe est impossible.
+	# Vérification de cohérence : avec un seul comportement valide (wait), result = wait.
+	var weights = {ObstacleBehavior.WAIT: 100}
+	var result = ObstacleBehavior.resolve([ObstacleBehavior.WAIT], 4, 2, _state, 0, weights)
+	assert_eq(result["action"], "wait", "avancée directe hors scope → resolve retourne wait correct")
+
+# ── build_weight_table ────────────────────────────────────────────
+
+func test_build_weight_table_correct_cumulative() -> void:
+	var entries = [
+		{"behavior": ObstacleBehavior.WAIT, "result": {"action": "wait"}},
+		{"behavior": ObstacleBehavior.SIDESTEP_LEFT, "result": {"action": "move", "row": 4, "lane": 1}},
+	]
+	var weights = {ObstacleBehavior.WAIT: 20, ObstacleBehavior.SIDESTEP_LEFT: 30}
+	var table = ObstacleBehavior.build_weight_table(entries, weights)
+	assert_eq(table.size(), 2, "table a 2 entrées")
+	assert_eq(table[0]["cumulative"], 20, "premier seuil cumulé = 20")
+	assert_eq(table[1]["cumulative"], 50, "second seuil cumulé = 50")
+
+func test_build_weight_table_missing_key_defaults_to_1() -> void:
+	var entries = [
+		{"behavior": ObstacleBehavior.WAIT, "result": {"action": "wait"}},
+		{"behavior": ObstacleBehavior.SIDESTEP_LEFT, "result": {"action": "move", "row": 4, "lane": 1}},
+	]
+	var table = ObstacleBehavior.build_weight_table(entries, {})
+	assert_eq(table[0]["cumulative"], 1, "poids manquant → défaut 1, cumulé 1")
+	assert_eq(table[1]["cumulative"], 2, "second poids manquant → défaut 1, cumulé 2")
+
+func test_build_weight_table_negative_weight_treated_as_0() -> void:
+	var entries = [
+		{"behavior": ObstacleBehavior.WAIT, "result": {"action": "wait"}},
+		{"behavior": ObstacleBehavior.SIDESTEP_LEFT, "result": {"action": "move", "row": 4, "lane": 1}},
+	]
+	var weights = {ObstacleBehavior.WAIT: -5, ObstacleBehavior.SIDESTEP_LEFT: 10}
+	var table = ObstacleBehavior.build_weight_table(entries, weights)
+	assert_eq(table[0]["cumulative"], 0, "poids négatif → traité comme 0, cumulé 0")
+	assert_eq(table[1]["cumulative"], 10, "second poids normal, cumulé 10")
+
+# ── select_from_weight_table ──────────────────────────────────────
+
+func test_select_from_table_pick_first_bucket() -> void:
+	var wait_entry   = {"behavior": ObstacleBehavior.WAIT,          "result": {"action": "wait"}}
+	var move_entry   = {"behavior": ObstacleBehavior.SIDESTEP_LEFT, "result": {"action": "move", "row": 4, "lane": 1}}
+	var table = [
+		{"cumulative": 20, "entry": wait_entry},
+		{"cumulative": 50, "entry": move_entry},
+	]
+	# seed=0, total=50, pick=0%50=0. 0 < 20 → wait
+	var selected = ObstacleBehavior.select_from_weight_table(table, 0)
+	assert_eq(selected["behavior"], ObstacleBehavior.WAIT, "pick=0 < seuil 20 → wait sélectionné")
+
+func test_select_from_table_pick_second_bucket() -> void:
+	var wait_entry   = {"behavior": ObstacleBehavior.WAIT,          "result": {"action": "wait"}}
+	var move_entry   = {"behavior": ObstacleBehavior.SIDESTEP_LEFT, "result": {"action": "move", "row": 4, "lane": 1}}
+	var table = [
+		{"cumulative": 20, "entry": wait_entry},
+		{"cumulative": 50, "entry": move_entry},
+	]
+	# seed=25, total=50, pick=25%50=25. 25 >= 20, 25 < 50 → move
+	var selected = ObstacleBehavior.select_from_weight_table(table, 25)
+	assert_eq(selected["behavior"], ObstacleBehavior.SIDESTEP_LEFT, "pick=25 dans [20,50[ → sidestep_left")
+
+func test_select_from_table_deterministic() -> void:
+	var wait_entry = {"behavior": ObstacleBehavior.WAIT, "result": {"action": "wait"}}
+	var move_entry = {"behavior": ObstacleBehavior.SIDESTEP_LEFT, "result": {"action": "move", "row": 4, "lane": 1}}
+	var table = [{"cumulative": 20, "entry": wait_entry}, {"cumulative": 50, "entry": move_entry}]
+	var s1 = ObstacleBehavior.select_from_weight_table(table, 7)
+	var s2 = ObstacleBehavior.select_from_weight_table(table, 7)
+	assert_eq(s1["behavior"], s2["behavior"], "même seed → même résultat (déterministe)")
+
+func test_select_from_table_all_zero_weights_returns_first() -> void:
+	var wait_entry = {"behavior": ObstacleBehavior.WAIT, "result": {"action": "wait"}}
+	var move_entry = {"behavior": ObstacleBehavior.SIDESTEP_LEFT, "result": {"action": "move", "row": 4, "lane": 1}}
+	var table = [{"cumulative": 0, "entry": wait_entry}, {"cumulative": 0, "entry": move_entry}]
+	var selected = ObstacleBehavior.select_from_weight_table(table, 42)
+	assert_eq(selected["behavior"], ObstacleBehavior.WAIT, "tous poids nuls → fallback = première entrée")
+
+# ── intégration MONSTER_DEFS : behavior_weights ───────────────────
+
+func test_all_monster_defs_have_behavior_weights_field() -> void:
+	for monster_id in GameData.MONSTER_DEFS:
+		var def = GameData.MONSTER_DEFS[monster_id]
+		assert_true(def.has("behavior_weights"),
+			"MONSTER_DEFS['%s'] doit avoir le champ behavior_weights" % monster_id)
+		assert_true(def["behavior_weights"] is Dictionary,
+			"behavior_weights de '%s' doit être un Dictionary" % monster_id)
+
+func test_single_behavior_monsters_have_empty_weights() -> void:
+	# Monstres avec un seul comportement → dict vide (mode ordonné trivial)
+	for monster_id in ["g", "boss_g", "boss_b", "boss_r"]:
+		var weights = GameData.MONSTER_DEFS[monster_id]["behavior_weights"]
+		assert_true(weights.is_empty(),
+			"'%s' (1 comportement) → behavior_weights vide" % monster_id)
+
+func test_blue_goblin_weights_cover_all_behaviors() -> void:
+	var behaviors = GameData.MONSTER_DEFS["b"]["obstacle_behaviors"]
+	var weights   = GameData.MONSTER_DEFS["b"]["behavior_weights"]
+	for b in behaviors:
+		assert_true(weights.has(b),
+			"gobelin bleu : poids défini pour comportement '%s'" % b)
+
+func test_red_goblin_weights_cover_all_behaviors() -> void:
+	var behaviors = GameData.MONSTER_DEFS["r"]["obstacle_behaviors"]
+	var weights   = GameData.MONSTER_DEFS["r"]["behavior_weights"]
+	for b in behaviors:
+		assert_true(weights.has(b),
+			"gobelin rouge : poids défini pour comportement '%s'" % b)
+
+func test_blue_goblin_weights_favor_movement_over_wait() -> void:
+	var weights = GameData.MONSTER_DEFS["b"]["behavior_weights"]
+	var move_w = weights.get(ObstacleBehavior.SIDESTEP_LEFT, 0) + weights.get(ObstacleBehavior.SIDESTEP_RIGHT, 0)
+	var wait_w = weights.get(ObstacleBehavior.WAIT, 0)
+	assert_true(move_w > wait_w,
+		"gobelin bleu : poids total mouvement > poids attente (profil rusé)")
+
+func test_red_goblin_weights_favor_movement_over_wait() -> void:
+	var weights = GameData.MONSTER_DEFS["r"]["behavior_weights"]
+	var move_w = weights.get(ObstacleBehavior.SIDESTEP_RANDOM, 0) + weights.get(ObstacleBehavior.JUMP_OBSTACLE, 0)
+	var wait_w = weights.get(ObstacleBehavior.WAIT, 0)
+	assert_true(move_w > wait_w,
+		"gobelin rouge : poids total mouvement > poids attente (profil agressif)")
+
+func test_all_weights_are_non_negative() -> void:
+	for monster_id in GameData.MONSTER_DEFS:
+		var weights = GameData.MONSTER_DEFS[monster_id]["behavior_weights"]
+		for behavior_id in weights:
+			assert_true(weights[behavior_id] >= 0,
+				"MONSTER_DEFS['%s']['%s'] : poids doit être >= 0" % [monster_id, behavior_id])

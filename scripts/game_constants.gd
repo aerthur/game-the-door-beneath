@@ -52,6 +52,8 @@ const MONSTER_DEFS = {
 		"sprite_path":        "res://assets/characters/goblin_green.svg",
 		# Comportement simple : attend quand bloqué, ne contourne pas
 		"obstacle_behaviors": [ObstacleBehavior.WAIT],
+		# Un seul comportement → dict vide, sélection ordonnée triviale
+		"behavior_weights": {},
 		"palette": {
 			"main": Color(0.25, 0.52, 0.14),
 			"dark": Color(0.22, 0.48, 0.12),
@@ -70,8 +72,14 @@ const MONSTER_DEFS = {
 		"is_boss":            false,
 		"tags":               [],
 		"sprite_path":        "res://assets/characters/goblin_blue.svg",
-		# Comportement rusé : essaie de contourner gauche puis droite avant d'attendre
+		# Comportement rusé : essaie de contourner des deux côtés avant d'attendre
+		# Poids équilibrés gauche/droite (40/40) ; wait rare (20) pour conserver la pression
 		"obstacle_behaviors": [ObstacleBehavior.SIDESTEP_LEFT, ObstacleBehavior.SIDESTEP_RIGHT, ObstacleBehavior.WAIT],
+		"behavior_weights": {
+			ObstacleBehavior.SIDESTEP_LEFT:  40,
+			ObstacleBehavior.SIDESTEP_RIGHT: 40,
+			ObstacleBehavior.WAIT:           20,
+		},
 		"palette": {
 			"main": Color(0.18, 0.30, 0.78),
 			"dark": Color(0.15, 0.25, 0.70),
@@ -91,7 +99,13 @@ const MONSTER_DEFS = {
 		"tags":               [],
 		"sprite_path":        "res://assets/characters/goblin_red.svg",
 		# Comportement agressif : contourne aléatoirement, saute si impossible, sinon attend
+		# Poids favorisent le mouvement (80%) ; saut plus rare que sidestep (30 vs 50)
 		"obstacle_behaviors": [ObstacleBehavior.SIDESTEP_RANDOM, ObstacleBehavior.JUMP_OBSTACLE, ObstacleBehavior.WAIT],
+		"behavior_weights": {
+			ObstacleBehavior.SIDESTEP_RANDOM: 50,
+			ObstacleBehavior.JUMP_OBSTACLE:   30,
+			ObstacleBehavior.WAIT:            20,
+		},
 		"palette": {
 			"main": Color(0.80, 0.12, 0.08),
 			"dark": Color(0.72, 0.10, 0.08),
@@ -115,6 +129,7 @@ const MONSTER_DEFS = {
 		"sprite_path":        "res://assets/characters/boss_green.svg",
 		# Les boss tiennent leur lane, ne se déplacent pas latéralement
 		"obstacle_behaviors": [ObstacleBehavior.WAIT],
+		"behavior_weights": {},
 		"palette": {
 			"main": Color(0.25, 0.52, 0.14),
 			"dark": Color(0.22, 0.48, 0.12),
@@ -135,6 +150,7 @@ const MONSTER_DEFS = {
 		"tags":               ["boss"],
 		"sprite_path":        "res://assets/characters/boss_blue.svg",
 		"obstacle_behaviors": [ObstacleBehavior.WAIT],
+		"behavior_weights": {},
 		"palette": {
 			"main": Color(0.22, 0.35, 0.75),
 			"dark": Color(0.18, 0.30, 0.68),
@@ -155,6 +171,7 @@ const MONSTER_DEFS = {
 		"tags":               ["boss"],
 		"sprite_path":        "res://assets/characters/boss_red.svg",
 		"obstacle_behaviors": [ObstacleBehavior.WAIT],
+		"behavior_weights": {},
 		"palette": {
 			"main": Color(0.75, 0.18, 0.12),
 			"dark": Color(0.68, 0.15, 0.10),
