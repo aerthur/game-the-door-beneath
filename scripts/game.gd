@@ -23,6 +23,8 @@ var active_gems : Array = []
 
 var tick_acc      : float = 0.0
 var tick_interval : float = 1.0 / 12.0  # simulation fixe à 12 ticks/s (GameData.TICKS_PER_SECOND)
+var _tick_count   : int   = 0           # compteur global de ticks (seed variation comportements)
+var _rng_salt     : int   = 0           # salt aléatoire par run (varie le comportement entre runs)
 
 @onready var monsters_node  : Node2D      = $Monsters
 @onready var player_node    : Node2D      = $Player
@@ -44,6 +46,7 @@ func _ready():
 	#var dbg = ColorRect.new(); dbg.color = Color(1, 0, 0, 1); dbg.position = Vector2(10, 10); dbg.size = Vector2(500, 120); hud.add_child(dbg); var dbg_label = Label.new(); dbg_label.text = "READY 1"; dbg_label.position = Vector2(30, 35); dbg_label.scale = Vector2(3, 3); dbg_label.add_theme_color_override("font_color", Color(1, 1, 0)); hud.add_child(dbg_label)
 	#var dbg = ColorRect.new(); dbg.color = Color(1, 0, 0, 1); dbg.position = Vector2(20, 20); dbg.size = Vector2(260, 60); hud.add_child(dbg); var dbg_label = Label.new(); dbg_label.text = "READY 1"; dbg_label.position = Vector2(30, 30); hud.add_child(dbg_label)
 	add_to_group("game")
+	_rng_salt = randi()
 	records_ctrl.hud = hud
 	records_ctrl.load_records()
 	visuals.bg = bg
@@ -70,9 +73,14 @@ func _ready():
 	#dbg.color = Color(0, 0.8, 0, 1); dbg_label.text = "READY OK"
 
 # ── Grille ───────────────────────────────────────────────────────
+var _obstacle_visuals : Dictionary = {}  # Vector2i(r,l) → {bg, lbl, hp_bg, hp_fill}
+
 func _init_grid():
 	board_state.clear_all()
 	_setup_test_obstacles()
+	# Rafraîchit les visuels d'obstacles si le fond a déjà été dessiné
+	if not _obstacle_visuals.is_empty() or bg.get_child_count() > 0:
+		_refresh_obstacle_visuals()
 
 # Obstacles de test — à retirer ou adapter quand les salles seront data-driven.
 func _setup_test_obstacles():
@@ -98,28 +106,83 @@ func _draw_background():
 			bg.add_child(cell)
 	_draw_obstacles()
 
-# Dessine les obstacles de test comme overlays sur les cellules concernées.
+# Dessine les obstacles comme overlays et stocke les références visuelles.
 func _draw_obstacles():
-	var test_cells = []
+	_obstacle_visuals.clear()
 	for r in BoardGeometry.GRID_ROWS:
 		for l in BoardGeometry.GRID_COLUMNS:
 			if board_state.has_obstacle(r, l):
-				test_cells.append([r, l])
-	for coord in test_cells:
-		var r : int = coord[0]
-		var l : int = coord[1]
-		var rect = ColorRect.new()
-		rect.position = Vector2(
-			BoardGeometry.GRID_ORIGIN_X + l * BoardGeometry.CELL_WIDTH + 1,
-			BoardGeometry.GRID_ORIGIN_Y + r * BoardGeometry.CELL_HEIGHT + 1)
-		rect.size  = Vector2(BoardGeometry.CELL_WIDTH - 3, BoardGeometry.CELL_HEIGHT - 3)
-		rect.color = Color(0.28, 0.22, 0.12, 0.92)
-		bg.add_child(rect)
-		var lbl = Label.new()
-		lbl.text = "▪"
-		lbl.position = rect.position + Vector2(BoardGeometry.CELL_WIDTH * 0.5 - 8, BoardGeometry.CELL_HEIGHT * 0.5 - 10)
-		lbl.add_theme_color_override("font_color", Color(0.55, 0.45, 0.30))
-		bg.add_child(lbl)
+				_create_obstacle_visual(r, l)
+
+func _create_obstacle_visual(r: int, l: int) -> void:
+	var obs    = board_state.get_obstacle(r, l)
+	var origin = Vector2(
+		BoardGeometry.GRID_ORIGIN_X + l * BoardGeometry.CELL_WIDTH + 1,
+		BoardGeometry.GRID_ORIGIN_Y + r * BoardGeometry.CELL_HEIGHT + 1)
+	var cell_w = BoardGeometry.CELL_WIDTH  - 3
+	var cell_h = BoardGeometry.CELL_HEIGHT - 3
+
+	var rect = ColorRect.new()
+	rect.position = origin
+	rect.size     = Vector2(cell_w, cell_h)
+	rect.color    = Color(0.28, 0.22, 0.12, 0.92)
+	bg.add_child(rect)
+
+	var lbl = Label.new()
+	lbl.text = "▪"
+	lbl.position = origin + Vector2(cell_w * 0.5 - 8, cell_h * 0.5 - 10)
+	lbl.add_theme_color_override("font_color", Color(0.55, 0.45, 0.30))
+	bg.add_child(lbl)
+
+	var hp_bg   : ColorRect = null
+	var hp_fill : ColorRect = null
+	if obs.destructibility == "destructible":
+		var bar_h = 5
+		var bar_y = origin.y + cell_h - bar_h - 2
+		hp_bg = ColorRect.new()
+		hp_bg.position = Vector2(origin.x + 2, bar_y)
+		hp_bg.size     = Vector2(cell_w - 4, bar_h)
+		hp_bg.color    = Color(0.20, 0.05, 0.05)
+		bg.add_child(hp_bg)
+
+		hp_fill = ColorRect.new()
+		hp_fill.position = hp_bg.position
+		hp_fill.size     = hp_bg.size
+		hp_fill.color    = Color(0.75, 0.15, 0.10)
+		bg.add_child(hp_fill)
+
+	_obstacle_visuals[Vector2i(r, l)] = {
+		"bg": rect, "lbl": lbl, "hp_bg": hp_bg, "hp_fill": hp_fill
+	}
+
+# Met à jour le visuel d'un obstacle après un changement de HP.
+func _update_obstacle_visual(r: int, l: int) -> void:
+	var key = Vector2i(r, l)
+	if not _obstacle_visuals.has(key):
+		return
+	var vis = _obstacle_visuals[key]
+	var obs = board_state.get_obstacle(r, l)
+	if obs == null:
+		return
+	if obs.destructibility == "destructible":
+		if obs.hp <= 0:
+			vis["bg"].visible      = false
+			vis["lbl"].visible     = false
+			if vis["hp_bg"]   != null: vis["hp_bg"].visible   = false
+			if vis["hp_fill"] != null: vis["hp_fill"].visible = false
+		else:
+			var ratio    = float(obs.hp) / float(obs.max_hp)
+			var max_w    = vis["hp_bg"].size.x
+			vis["hp_fill"].size.x = max(1.0, max_w * ratio)
+
+# Supprime les anciens nœuds visuels et les recrée depuis board_state.
+func _refresh_obstacle_visuals() -> void:
+	for key in _obstacle_visuals:
+		var vis = _obstacle_visuals[key]
+		for node in [vis["bg"], vis["lbl"], vis["hp_bg"], vis["hp_fill"]]:
+			if node != null and is_instance_valid(node):
+				node.queue_free()
+	_draw_obstacles()
 
 # ── Salle ────────────────────────────────────────────────────────
 func _start_room(num: int):
@@ -163,6 +226,7 @@ func _process(delta: float):
 
 # ── Tick ─────────────────────────────────────────────────────────
 func _do_tick():
+	_tick_count += 1
 	# Prévient les doubles mouvements : un monstre ayant sidestepped dans ce tick
 	# ne doit pas être traité à nouveau quand la boucle atteint sa nouvelle position.
 	var moved_this_tick : Dictionary = {}
@@ -224,7 +288,9 @@ func _do_tick():
 					tw.tween_property(m, "position", grid_pos(new_row, l), 0.25)
 				else:
 					# Avancée directe impossible → résolution de comportement d'obstacle
-					var rng_seed = r * BoardGeometry.GRID_COLUMNS + l
+					# Seed combine position ET tick courant : même monstre à même position
+					# peut choisir un comportement différent au fil du temps.
+					var rng_seed = _rng_salt + _tick_count * BoardGeometry.GRID_COLUMNS * BoardGeometry.GRID_ROWS + r * BoardGeometry.GRID_COLUMNS + l
 					var action = ObstacleBehavior.resolve(m.obstacle_behaviors, r, l, board_state, rng_seed, m.behavior_weights)
 					if action["action"] == "move":
 						var dst_lane : int = action["lane"]
@@ -242,6 +308,7 @@ func _do_tick():
 						# Le monstre reste en place et inflige ses dégâts d'obstacle.
 						# board_state.damage_obstacle gère la destruction (hp <= 0 → flags off).
 						board_state.damage_obstacle(action["row"], action["lane"], m.obstacle_damage)
+						_update_obstacle_visual(action["row"], action["lane"])
 					# else: "wait" — pas de mouvement ce tick
 	# Traitement des respawns en attente après les déplacements
 	_execute_respawn_results(enemies.tick_pending_respawns())

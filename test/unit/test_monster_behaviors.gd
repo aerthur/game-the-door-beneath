@@ -239,9 +239,10 @@ func test_blue_goblin_tries_sidestep() -> void:
 
 func test_red_goblin_uses_random_sidestep_and_jump() -> void:
 	var behaviors = GameData.MONSTER_DEFS["r"]["obstacle_behaviors"]
-	assert_true(behaviors.has(ObstacleBehavior.SIDESTEP_RANDOM), "gobelin rouge : sidestep_random autorisé")
-	assert_true(behaviors.has(ObstacleBehavior.JUMP_OBSTACLE),   "gobelin rouge : jump_obstacle autorisé")
-	assert_true(behaviors.has(ObstacleBehavior.WAIT),            "gobelin rouge : wait en fallback")
+	assert_true(behaviors.has(ObstacleBehavior.SIDESTEP_RANDOM),  "gobelin rouge : sidestep_random autorisé")
+	assert_true(behaviors.has(ObstacleBehavior.JUMP_OBSTACLE),    "gobelin rouge : jump_obstacle autorisé")
+	assert_true(behaviors.has(ObstacleBehavior.DESTROY_OBSTACLE), "gobelin rouge : destroy_obstacle autorisé")
+	assert_true(behaviors.has(ObstacleBehavior.WAIT),             "gobelin rouge : wait en fallback")
 
 func test_bosses_only_wait() -> void:
 	for boss_id in ["boss_g", "boss_b", "boss_r"]:
@@ -441,7 +442,9 @@ func test_blue_goblin_weights_favor_movement_over_wait() -> void:
 
 func test_red_goblin_weights_favor_movement_over_wait() -> void:
 	var weights = GameData.MONSTER_DEFS["r"]["behavior_weights"]
-	var move_w = weights.get(ObstacleBehavior.SIDESTEP_RANDOM, 0) + weights.get(ObstacleBehavior.JUMP_OBSTACLE, 0)
+	var move_w = weights.get(ObstacleBehavior.SIDESTEP_RANDOM, 0) \
+			   + weights.get(ObstacleBehavior.JUMP_OBSTACLE, 0) \
+			   + weights.get(ObstacleBehavior.DESTROY_OBSTACLE, 0)
 	var wait_w = weights.get(ObstacleBehavior.WAIT, 0)
 	assert_true(move_w > wait_w,
 		"gobelin rouge : poids total mouvement > poids attente (profil agressif)")

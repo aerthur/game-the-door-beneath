@@ -290,6 +290,8 @@ var game_over          : bool
 var leveling_up        : bool
 var active_weapons     : Array      # [{"id": "arc", "level": 1, "acc": 0.0}, ...]
 var board_state        : BoardState # source de vérité pour l'occupation de la grille
+var _tick_count        : int        # incrémenté à chaque _do_tick() — composant temporel du rng_seed
+var _rng_salt          : int        # randi() à _ready() — garantit la variété entre runs dans le rng_seed
 ```
 
 ### Fonctions importantes (game.gd)
@@ -399,7 +401,7 @@ Le saut se déroule sur **3 move periods** (consommation équivalente à 3 dépl
 
 **Anti-double-mouvement** : `game.gd._do_tick()` maintient un dictionnaire `moved_this_tick` qui empêche un monstre ayant sidestepped (vers une lane non encore traitée) d'être traité une deuxième fois dans le même tick.
 
-**rng_seed déterministe** : calculé comme `row * GRID_COLUMNS + lane` — un monstre à la même position produit toujours le même choix, compatible simulation 12 tps.
+**rng_seed déterministe** : calculé comme `_rng_salt + _tick_count * COLS * ROWS + row * COLS + lane` — `_rng_salt` est initialisé avec `randi()` dans `_ready()` pour que chaque run produise des résultats différents ; `_tick_count` intègre le temps de simulation pour que le même monstre à la même position puisse choisir un comportement différent au fil du temps. La combinaison garantit à la fois la variété entre runs et le déterminisme intra-tick.
 
 **Profils par monstre dans MONSTER_DEFS** :
 
