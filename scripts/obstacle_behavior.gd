@@ -139,7 +139,14 @@ static func _try_behavior(
 			var target_row = row + 2
 			if target_row < BoardGeometry.GRID_ROWS:
 				return {"action": "jump_start", "row": target_row, "lane": lane}
-		# DESTROY_OBSTACLE : non implémenté, ignoré silencieusement
+		DESTROY_OBSTACLE:
+			# Valide uniquement si la cellule devant le monstre (row+1) porte un obstacle
+			# destructible non encore détruit. Indestructible ou déjà détruit → invalide.
+			var target_row = row + 1
+			if target_row < BoardGeometry.GRID_ROWS:
+				if board_state.is_obstacle_destructible(target_row, lane) \
+				and not board_state.is_obstacle_destroyed(target_row, lane):
+					return {"action": "destroy_obstacle", "row": target_row, "lane": lane}
 	return null
 
 # Vérifie qu'une cellule latérale est dans les bornes, libre et non bloquée.

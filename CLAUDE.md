@@ -290,6 +290,8 @@ var game_over          : bool
 var leveling_up        : bool
 var active_weapons     : Array      # [{"id": "arc", "level": 1, "acc": 0.0}, ...]
 var board_state        : BoardState # source de vérité pour l'occupation de la grille
+var _tick_count        : int        # incrémenté à chaque _do_tick() — composant temporel du rng_seed
+var _rng_salt          : int        # randi() à _ready() — garantit la variété entre runs dans le rng_seed
 ```
 
 ### Fonctions importantes (game.gd)
@@ -354,7 +356,7 @@ Quand un monstre tente d'avancer vers `new_row = r + 1` mais que la cellule est 
 | `"sidestep_right"` | `ObstacleBehavior.SIDESTEP_RIGHT` | Se déplace latéralement vers `lane + 1` (même rangée) |
 | `"sidestep_random"` | `ObstacleBehavior.SIDESTEP_RANDOM` | Choisit gauche ou droite selon `rng_seed % 2` (déterministe) |
 | `"jump_obstacle"` | `ObstacleBehavior.JUMP_OBSTACLE` | Franchit la cellule bloquante (`row+1`) pour atterrir en `row+2` — action multi-ticks (3 move periods) |
-| `"destroy_obstacle"` | `ObstacleBehavior.DESTROY_OBSTACLE` | **Réservé** — requiert obstacle destructible actif |
+| `"destroy_obstacle"` | `ObstacleBehavior.DESTROY_OBSTACLE` | Reste en place et inflige `obstacle_damage` à l'obstacle destructible qui bloque sa progression (issue #76) |
 
 **Deux modes de sélection** selon `behavior_weights` dans `MONSTER_DEFS` (issue #75) :
 
@@ -399,7 +401,7 @@ Le saut se déroule sur **3 move periods** (consommation équivalente à 3 dépl
 
 **Anti-double-mouvement** : `game.gd._do_tick()` maintient un dictionnaire `moved_this_tick` qui empêche un monstre ayant sidestepped (vers une lane non encore traitée) d'être traité une deuxième fois dans le même tick.
 
-**rng_seed déterministe** : calculé comme `row * GRID_COLUMNS + lane` — un monstre à la même position produit toujours le même choix, compatible simulation 12 tps.
+**rng_seed déterministe** : calculé comme `_rng_salt + _tick_count * COLS * ROWS + row * COLS + lane` — `_rng_salt` est initialisé avec `randi()` dans `_ready()` pour que chaque run produise des résultats différents ; `_tick_count` intègre le temps de simulation pour que le même monstre à la même position puisse choisir un comportement différent au fil du temps. La combinaison garantit à la fois la variété entre runs et le déterminisme intra-tick.
 
 **Profils par monstre dans MONSTER_DEFS** :
 
@@ -407,15 +409,34 @@ Le saut se déroule sur **3 move periods** (consommation équivalente à 3 dépl
 |---|---|---|---|
 | Gobelin vert (`"g"`) | `[WAIT]` | `{}` | Ordonné (trivial) |
 | Gobelin bleu (`"b"`) | `[SIDESTEP_LEFT, SIDESTEP_RIGHT, WAIT]` | `{left:40, right:40, wait:20}` | Pondéré, pas de biais gauche |
-| Gobelin rouge (`"r"`) | `[SIDESTEP_RANDOM, JUMP_OBSTACLE, WAIT]` | `{random:50, jump:30, wait:20}` | Pondéré, favorise le mouvement |
+| Gobelin rouge (`"r"`) | `[SIDESTEP_RANDOM, JUMP_OBSTACLE, DESTROY_OBSTACLE, WAIT]` | `{random:40, jump:20, destroy:25, wait:15}` | Pondéré, favorise le mouvement (85%) |
 | Boss (`"boss_*"`) | `[WAIT]` | `{}` | Ordonné (tient sa lane) |
+
+**Comportement `destroy_obstacle` — mécanique (issue #76) :**
+
+Valide uniquement si la cellule `(row+1, lane)` contient un obstacle **destructible non encore détruit**. Un obstacle indestructible ou déjà détruit rend le comportement invalide pour ce tick.
+
+Quand sélectionné :
+- Le monstre **reste en place** (pas de déplacement ce tick)
+- `board_state.damage_obstacle(row+1, lane, m.obstacle_damage)` est appelé depuis `game.gd._do_tick()`
+- Si `hp <= 0` après les dégâts : `blocks_movement = false`, `blocks_occupancy = false` → cellule débloquée au tick suivant
+- Le monstre réévalue ses comportements normalement au tick suivant (le chemin peut être libéré)
+
+Champ `obstacle_damage` dans `MONSTER_DEFS` : dégâts infligés par attaque d'obstacle. `0` = ne peut pas détruire.
+
+| Monstre | `obstacle_damage` |
+|---|---|
+| Gobelin vert (`"g"`) | 0 |
+| Gobelin bleu (`"b"`) | 0 |
+| Gobelin rouge (`"r"`) | 20 |
+| Boss (`"boss_*"`) | 0 |
 
 **Fichiers concernés** :
 - `scripts/obstacle_behavior.gd` — résolveur pur + helpers `build_weight_table` / `select_from_weight_table`
-- `scripts/game_constants.gd` — champs `obstacle_behaviors` + `behavior_weights` dans `MONSTER_DEFS`
-- `scripts/monster.gd` — variable `behavior_weights`, chargée dans `setup_from_def()`
-- `scripts/game.gd` — passe `m.behavior_weights` à `resolve()` dans `_do_tick()`
-- `test/unit/test_monster_behaviors.gd` — tests unitaires GUT (comportements + sélection pondérée)
+- `scripts/game_constants.gd` — champs `obstacle_behaviors`, `behavior_weights`, `obstacle_damage` dans `MONSTER_DEFS`
+- `scripts/monster.gd` — variables `behavior_weights` et `obstacle_damage`, chargées dans `setup_from_def()`
+- `scripts/game.gd` — passe `m.behavior_weights` à `resolve()` et gère `destroy_obstacle` dans `_do_tick()`
+- `test/unit/test_monster_behaviors.gd` — tests unitaires GUT (comportements + sélection pondérée + destroy_obstacle)
 
 ### Politique de respawn prioritaire (issue #70)
 

@@ -16,6 +16,7 @@ var grid_lane            : int = 0
 var behavior             : String = "standard"
 var obstacle_behaviors   : Array = [ObstacleBehavior.WAIT]
 var behavior_weights     : Dictionary = {}
+var obstacle_damage      : int = 10  # dégâts infligés aux obstacles (destroy_obstacle)
 var palette              : Dictionary = {}
 var tags                 : Array = []
 
@@ -55,6 +56,7 @@ func setup_from_def(monster_id: String, def: Dictionary) -> void:
 	behavior            = def.get("behavior", "standard")
 	obstacle_behaviors  = def.get("obstacle_behaviors", [ObstacleBehavior.WAIT]).duplicate()
 	behavior_weights    = def.get("behavior_weights", {}).duplicate()
+	obstacle_damage     = def.get("obstacle_damage", 10)
 	tags                = def.get("tags", []).duplicate()
 	# Conversion move_speed → période en ticks (12 tps)
 	# move_speed 1 → 12 ticks/move (1 case/s) ; move_speed 2 → 6 ticks/move (2 cases/s)
