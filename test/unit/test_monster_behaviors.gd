@@ -119,21 +119,82 @@ func test_priority_first_valid_wins() -> void:
 		[ObstacleBehavior.SIDESTEP_RIGHT, ObstacleBehavior.SIDESTEP_LEFT], 4, 2, _state)
 	assert_eq(result["lane"], 1, "droite bloquée → premier valide = gauche → lane 1")
 
-# ── comportements réservés (non implémentés) ─────────────────────
-
-func test_jump_obstacle_placeholder_skipped() -> void:
-	# jump_obstacle non implémenté → ignoré, tombe sur wait
-	var result = ObstacleBehavior.resolve([ObstacleBehavior.JUMP_OBSTACLE], 4, 2, _state)
-	assert_eq(result["action"], "wait", "jump_obstacle (réservé) → ignoré → wait")
+# ── destroy_obstacle (toujours réservé) ──────────────────────────
 
 func test_destroy_obstacle_placeholder_skipped() -> void:
 	var result = ObstacleBehavior.resolve([ObstacleBehavior.DESTROY_OBSTACLE], 4, 2, _state)
 	assert_eq(result["action"], "wait", "destroy_obstacle (réservé) → ignoré → wait")
 
-func test_reserved_then_wait_falls_to_wait() -> void:
+# ── jump_obstacle : initiation ────────────────────────────────────
+
+func test_jump_start_returned_when_target_in_bounds() -> void:
+	# row 4 → cible row 6 (dans la grille GRID_ROWS=8)
+	var result = ObstacleBehavior.resolve([ObstacleBehavior.JUMP_OBSTACLE], 4, 2, _state)
+	assert_eq(result["action"], "jump_start", "jump_obstacle disponible → jump_start")
+	assert_eq(result["row"],    6,            "cible = row + 2")
+	assert_eq(result["lane"],   2,            "même lane (saut vertical)")
+
+func test_jump_not_started_when_target_out_of_bounds() -> void:
+	# row 6 → cible row 8 hors grille (GRID_ROWS=8) → tombe sur wait
+	var result = ObstacleBehavior.resolve([ObstacleBehavior.JUMP_OBSTACLE], 6, 2, _state)
+	assert_eq(result["action"], "wait", "row 6 → cible row 8 hors grille → wait")
+
+func test_jump_then_wait_fallback_on_last_valid_row() -> void:
 	var result = ObstacleBehavior.resolve(
-		[ObstacleBehavior.JUMP_OBSTACLE, ObstacleBehavior.WAIT], 4, 2, _state)
-	assert_eq(result["action"], "wait", "réservé puis wait → action wait")
+		[ObstacleBehavior.JUMP_OBSTACLE, ObstacleBehavior.WAIT], 6, 2, _state)
+	assert_eq(result["action"], "wait", "jump hors grille + wait en fallback → wait")
+
+# ── jump_obstacle : cycle de vie complet ─────────────────────────
+
+func test_jump_ticks_progress_correctly() -> void:
+	var m = Monster.new()
+	m.start_jump(6, 2)
+	assert_eq(m.jump_ticks_remaining, 2, "saut initié : 2 move periods restants")
+	m.tick_jump()
+	assert_eq(m.jump_ticks_remaining, 1, "après tick 1 : 1 move period restant")
+	m.tick_jump()
+	assert_eq(m.jump_ticks_remaining, 0, "après tick 2 : résolution (3 move periods consommées)")
+	m.free()
+
+func test_is_jumping_flag() -> void:
+	var m = Monster.new()
+	assert_false(m.is_jumping(), "par défaut : pas en saut")
+	m.start_jump(6, 2)
+	assert_true(m.is_jumping(), "après start_jump : en saut")
+	m.tick_jump()
+	assert_true(m.is_jumping(), "après tick 1 : toujours en saut")
+	m.tick_jump()
+	assert_false(m.is_jumping(), "après tick 2 : résolution — plus en saut")
+	m.free()
+
+func test_jump_validate_landing_free_cell() -> void:
+	assert_true(ObstacleBehavior.validate_jump_landing(6, 2, _state),
+		"cellule libre → atterrissage valide")
+
+func test_jump_validate_landing_blocked_by_obstacle() -> void:
+	_state.set_obstacle(6, 2, ObstacleData.make_wall())
+	assert_false(ObstacleBehavior.validate_jump_landing(6, 2, _state),
+		"cellule avec obstacle → atterrissage invalide")
+
+func test_jump_validate_landing_occupied_by_monster() -> void:
+	_state.set_cell_occupied(6, 2, "blocker")
+	assert_false(ObstacleBehavior.validate_jump_landing(6, 2, _state),
+		"cellule occupée → atterrissage invalide")
+
+func test_jump_validate_landing_out_of_bounds() -> void:
+	assert_false(ObstacleBehavior.validate_jump_landing(8, 2, _state),
+		"cellule hors grille → atterrissage invalide")
+
+func test_jump_cost_consumed_even_on_failure() -> void:
+	# Même si la cellule d'arrivée est bloquée, le coût temporel est entièrement consommé
+	_state.set_obstacle(6, 2, ObstacleData.make_wall())
+	var m = Monster.new()
+	m.start_jump(6, 2)
+	m.tick_jump()
+	m.tick_jump()
+	assert_eq(m.jump_ticks_remaining, 0,
+		"coût temporel consommé même si l'atterrissage final échoue")
+	m.free()
 
 # ── déterminisme simulation 12 tps ───────────────────────────────
 
@@ -174,9 +235,10 @@ func test_blue_goblin_tries_sidestep() -> void:
 	assert_true(behaviors.has(ObstacleBehavior.SIDESTEP_RIGHT), "gobelin bleu : sidestep_right autorisé")
 	assert_true(behaviors.has(ObstacleBehavior.WAIT),           "gobelin bleu : wait en fallback")
 
-func test_red_goblin_uses_random_sidestep() -> void:
+func test_red_goblin_uses_random_sidestep_and_jump() -> void:
 	var behaviors = GameData.MONSTER_DEFS["r"]["obstacle_behaviors"]
 	assert_true(behaviors.has(ObstacleBehavior.SIDESTEP_RANDOM), "gobelin rouge : sidestep_random autorisé")
+	assert_true(behaviors.has(ObstacleBehavior.JUMP_OBSTACLE),   "gobelin rouge : jump_obstacle autorisé")
 	assert_true(behaviors.has(ObstacleBehavior.WAIT),            "gobelin rouge : wait en fallback")
 
 func test_bosses_only_wait() -> void:

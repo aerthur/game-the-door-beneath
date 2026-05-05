@@ -353,12 +353,27 @@ Quand un monstre tente d'avancer vers `new_row = r + 1` mais que la cellule est 
 | `"sidestep_left"` | `ObstacleBehavior.SIDESTEP_LEFT` | Se déplace latéralement vers `lane - 1` (même rangée) |
 | `"sidestep_right"` | `ObstacleBehavior.SIDESTEP_RIGHT` | Se déplace latéralement vers `lane + 1` (même rangée) |
 | `"sidestep_random"` | `ObstacleBehavior.SIDESTEP_RANDOM` | Choisit gauche ou droite selon `rng_seed % 2` (déterministe) |
-| `"jump_obstacle"` | `ObstacleBehavior.JUMP_OBSTACLE` | **Réservé** — logique multi-ticks à concevoir |
+| `"jump_obstacle"` | `ObstacleBehavior.JUMP_OBSTACLE` | Franchit la cellule bloquante (`row+1`) pour atterrir en `row+2` — action multi-ticks (3 move periods) |
 | `"destroy_obstacle"` | `ObstacleBehavior.DESTROY_OBSTACLE` | **Réservé** — requiert obstacle destructible actif |
 
 **Règles de sélection** : le premier comportement de la liste dont la cellule cible est valide est retenu. Si aucun comportement n'est valide (ou si la liste est vide), l'action est `"wait"`.
 
 **Règle d'échec** : si la cible d'un sidestep est occupée ou bloquée au moment du test, le comportement est invalide pour ce tick. Le monstre réévaluera au tick suivant.
+
+**Comportement `jump_obstacle` — séquence multi-ticks :**
+
+Le saut se déroule sur **3 move periods** (consommation équivalente à 3 déplacements) :
+
+1. **Move period 1 (décision)** : `resolve()` retourne `{"action": "jump_start", "row": r+2, "lane": l}`. `game.gd` appelle `m.start_jump(r+2, l)` → `jump_ticks_remaining = 2`. Pas de déplacement.
+2. **Move period 2** : le monstre est verrouillé (`is_jumping() == true`). `tick_jump()` décrémente à 1. Pas de déplacement.
+3. **Move period 3 (résolution)** : `tick_jump()` décrémente à 0. `ObstacleBehavior.validate_jump_landing()` revalide la cellule cible via `BoardState` :
+   - **Succès** (cellule libre et non bloquée) : `board_state` mis à jour atomiquement, tween de position (`0.4s`), `moved_this_tick[m] = true`.
+   - **Échec** (cellule occupée ou bloquée) : aucun déplacement. Le coût temporel est **toujours consommé** — le monstre redevient libre au tick suivant.
+
+**Contraintes** :
+- La cellule d'arrivée n'est **pas réservée** avant la résolution finale (d'autres monstres peuvent l'occuper entre-temps).
+- Seules les **bornes de grille** (`row+2 < GRID_ROWS`) sont vérifiées à la décision ; l'occupabilité est vérifiée uniquement à la résolution.
+- Un monstre en saut est **verrouillé** : `move_countdown_ticks` décrémente normalement mais `is_jumping()` court-circuite la logique de déplacement standard.
 
 **Anti-double-mouvement** : `game.gd._do_tick()` maintient un dictionnaire `moved_this_tick` qui empêche un monstre ayant sidestepped (vers une lane non encore traitée) d'être traité une deuxième fois dans le même tick.
 
@@ -370,7 +385,7 @@ Quand un monstre tente d'avancer vers `new_row = r + 1` mais que la cellule est 
 |---|---|---|
 | Gobelin vert (`"g"`) | `[WAIT]` | Simple, reste bloqué |
 | Gobelin bleu (`"b"`) | `[SIDESTEP_LEFT, SIDESTEP_RIGHT, WAIT]` | Rusé, essaie les deux côtés |
-| Gobelin rouge (`"r"`) | `[SIDESTEP_RANDOM, WAIT]` | Agressif, contourne aléatoirement |
+| Gobelin rouge (`"r"`) | `[SIDESTEP_RANDOM, JUMP_OBSTACLE, WAIT]` | Agressif : contourne aléatoirement, saute si impossible |
 | Boss (`"boss_*"`) | `[WAIT]` | Tient sa lane, ne se déplace pas latéralement |
 
 **Fichiers concernés** :
