@@ -616,28 +616,37 @@ Scaling : `pow(1.5, (room - 15) / 5)` appliqué à hp, damage, xp_value au momen
 
 Le jeu supporte une expérience tactile sur navigateur mobile en **orientation paysage uniquement**.
 
+### Responsive (canvas_items)
+`project.godot` utilise `window/stretch/mode = "canvas_items"` et `window/stretch/aspect = "keep"` : le canvas 1280×720 est scalé automatiquement pour remplir n'importe quelle résolution en conservant le ratio 16:9 (letterbox/pillarbox sur les écrans non-16:9). `BoardGeometry` et le code gameplay restent en coordonnées 1280×720 virtuelles — aucune adaptation nécessaire pour de nouvelles résolutions.
+
 ### Orientation
 - `project.godot` force `window/handheld/orientation = "landscape"` sur mobile.
 - En portrait, `hud.gd` détecte automatiquement via `get_viewport().size_changed` et affiche un overlay plein écran invitant à tourner l'appareil. Aucune expérience de jeu n'est proposée en portrait.
 
-### Contrôles tactiles
-Trois boutons sont intégrés en bas de l'écran dans `hud.tscn` (`TouchButtons`), au-dessus de la zone XP :
-- **BtnLeft** (bas-gauche, 160×120 px) — déplacement à gauche
-- **BtnRight** (bas-droit, 160×120 px) — déplacement à droite
-- **BtnNextRoom** (centre-bas, 300×74 px) — passage à la salle suivante (visible uniquement quand la salle est vidée)
+### Contrôles tactiles — D-pad
+Un D-pad en croix est intégré dans `hud.tscn` (`TouchButtons/DPad`), ancré **bas-droite**, au-dessus de la XPZone :
+
+```
+TouchButtons (Control, plein écran, mouse_filter=IGNORE)
+└── DPad (Control, 210×210 px, ancré bas-droite, marge 15px droite / 60px bas)
+    ├── BtnUp    (▲, 70×70, centre-haut)   — disabled=true, réservé futur
+    ├── BtnLeft  (◀, 70×70, centre-gauche) — actif → action lane_left
+    ├── BtnRight (▶, 70×70, centre-droite) — actif → action lane_right
+    └── BtnDown  (▼, 70×70, centre-bas)   — disabled=true, réservé futur
+```
+
+`BtnUp` et `BtnDown` sont présents dans la scène mais `disabled = true` et visuellement atténués — l'armature est prête pour les futurs déplacements haut/bas sans modifier la structure.
 
 ### Architecture d'input unifiée
-Les boutons tactiles réutilisent les **actions Godot canoniques** (`lane_left`, `lane_right`, `next_room`) via `Input.parse_input_event(InputEventAction)`. Le flux est identique au clavier : les événements transitent par `game.gd._input()` → `game_player.handle_input()`. Il n'existe qu'un seul chemin de contrôle.
+Les boutons tactiles réutilisent les **actions Godot canoniques** (`lane_left`, `lane_right`) via `Input.parse_input_event(InputEventAction)`. Le flux est identique au clavier : les événements transitent par `game.gd._input()` → `game_player.handle_input()`. Il n'existe qu'un seul chemin de contrôle.
 
 ### Détection desktop vs mobile
-`hud.gd` utilise `DisplayServer.is_touchscreen_available()` dans `_ready()` pour initialiser `_touch_enabled`. Sur desktop/web PC, `_touch_enabled = false` → `touch_buttons.visible = false` dès le départ. Sur mobile, les boutons sont visibles et les actions utilisent `Input.parse_input_event(InputEventAction)` pour réutiliser les actions Godot canoniques.
-
-`show_door()` respecte `_touch_enabled` : `btn_next_room.visible = _touch_enabled` — le bouton "Salle suivante" n'apparaît que sur mobile même quand la salle est vidée.
+`hud.gd` utilise `DisplayServer.is_touchscreen_available()` dans `_ready()` pour initialiser `_touch_enabled`. Sur desktop/web PC, `_touch_enabled = false` → `touch_buttons.visible = false` dès le départ. Sur mobile, le D-pad est visible et stylé dark fantasy (`_style_dpad()` : fond semi-transparent, bordure or, hover or vif, boutons désactivés atténués).
 
 ### Fichiers concernés
-- `project.godot` — orientation paysage forcée
-- `scenes/ui/hud.tscn` — nœuds `TouchButtons` et `PortraitWarning` (sous `Layout` → séparés de la TopBar)
-- `scripts/hud.gd` — `_touch_enabled`, `_check_orientation()`, `_on_touch_left/right/next_room()`
+- `project.godot` — orientation paysage forcée + stretch canvas_items/keep
+- `scenes/ui/hud.tscn` — nœuds `TouchButtons/DPad` et `PortraitWarning`
+- `scripts/hud.gd` — `_touch_enabled`, `_check_orientation()`, `_style_dpad()`, `_on_touch_left/right()`
 
 ## Design du menu principal (title_screen)
 
