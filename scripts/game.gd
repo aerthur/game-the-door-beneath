@@ -238,6 +238,10 @@ func _do_tick():
 						tw.tween_property(m, "position", grid_pos(dst_row, dst_lane), 0.25)
 					elif action["action"] == "jump_start":
 						m.start_jump(action["row"], action["lane"])
+					elif action["action"] == "destroy_obstacle":
+						# Le monstre reste en place et inflige ses dégâts d'obstacle.
+						# board_state.damage_obstacle gère la destruction (hp <= 0 → flags off).
+						board_state.damage_obstacle(action["row"], action["lane"], m.obstacle_damage)
 					# else: "wait" — pas de mouvement ce tick
 	# Traitement des respawns en attente après les déplacements
 	_execute_respawn_results(enemies.tick_pending_respawns())
