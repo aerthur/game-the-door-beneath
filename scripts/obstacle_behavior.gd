@@ -6,7 +6,7 @@ const SIDESTEP_LEFT    = "sidestep_left"
 const SIDESTEP_RIGHT   = "sidestep_right"
 const SIDESTEP_RANDOM  = "sidestep_random"
 const JUMP_OBSTACLE    = "jump_obstacle"
-const DESTROY_OBSTACLE = "destroy_obstacle" # Réservé — requiert obstacle destructible actif
+const DESTROY_OBSTACLE = "destroy_obstacle" # Reste en place, inflige monster.damage à l'obstacle destructible en row+1
 
 # Résout l'action à prendre quand la cellule cible directe est bloquée.
 # L'avancée directe est supposée déjà vérifiée et échouée par l'appelant.
@@ -20,9 +20,10 @@ const DESTROY_OBSTACLE = "destroy_obstacle" # Réservé — requiert obstacle de
 # rng_seed : entier déterministe (ex: row * COLS + lane) pour sidestep_random et tirage pondéré.
 #
 # Retourne :
-#   {"action": "wait"}                            — aucun mouvement ce tick
-#   {"action": "move", "row": r, "lane": l}       — déplacement latéral
-#   {"action": "jump_start", "row": r, "lane": l} — initiation de saut multi-ticks
+#   {"action": "wait"}                               — aucun mouvement ce tick
+#   {"action": "move", "row": r, "lane": l}          — déplacement latéral
+#   {"action": "jump_start", "row": r, "lane": l}    — initiation de saut multi-ticks
+#   {"action": "destroy_obstacle", "row": r, "lane": l} — attaque l'obstacle en row+1
 static func resolve(
 	behaviors: Array,
 	row: int,
@@ -139,7 +140,10 @@ static func _try_behavior(
 			var target_row = row + 2
 			if target_row < BoardGeometry.GRID_ROWS:
 				return {"action": "jump_start", "row": target_row, "lane": lane}
-		# DESTROY_OBSTACLE : non implémenté, ignoré silencieusement
+		DESTROY_OBSTACLE:
+			var target_row = row + 1
+			if BoardGeometry.is_valid_cell(target_row, lane) and board_state.is_obstacle_destructible(target_row, lane):
+				return {"action": "destroy_obstacle", "row": target_row, "lane": lane}
 	return null
 
 # Vérifie qu'une cellule latérale est dans les bornes, libre et non bloquée.

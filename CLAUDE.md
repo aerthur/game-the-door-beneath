@@ -354,7 +354,7 @@ Quand un monstre tente d'avancer vers `new_row = r + 1` mais que la cellule est 
 | `"sidestep_right"` | `ObstacleBehavior.SIDESTEP_RIGHT` | Se déplace latéralement vers `lane + 1` (même rangée) |
 | `"sidestep_random"` | `ObstacleBehavior.SIDESTEP_RANDOM` | Choisit gauche ou droite selon `rng_seed % 2` (déterministe) |
 | `"jump_obstacle"` | `ObstacleBehavior.JUMP_OBSTACLE` | Franchit la cellule bloquante (`row+1`) pour atterrir en `row+2` — action multi-ticks (3 move periods) |
-| `"destroy_obstacle"` | `ObstacleBehavior.DESTROY_OBSTACLE` | **Réservé** — requiert obstacle destructible actif |
+| `"destroy_obstacle"` | `ObstacleBehavior.DESTROY_OBSTACLE` | Reste en place et inflige `monster.damage` dégâts à l'obstacle destructible en `row+1` |
 
 **Deux modes de sélection** selon `behavior_weights` dans `MONSTER_DEFS` (issue #75) :
 
@@ -401,13 +401,20 @@ Le saut se déroule sur **3 move periods** (consommation équivalente à 3 dépl
 
 **rng_seed déterministe** : calculé comme `row * GRID_COLUMNS + lane` — un monstre à la même position produit toujours le même choix, compatible simulation 12 tps.
 
+**Comportement `destroy_obstacle` — règles d'activation et de dégâts (issue #76) :**
+
+- **Condition de validité** : la cellule `row+1` est bloquée **et** l'obstacle bloquant est destructible (`is_obstacle_destructible()` retourne `true`). Un obstacle indestructible ou absent invalide le comportement.
+- **Règle de dégâts** : le monstre inflige `monster.damage` points de dégâts à l'obstacle via `board_state.damage_obstacle(row+1, lane, m.damage)`. Aucun déplacement — le monstre reste sur place.
+- **Après exécution** : si l'obstacle est détruit (`hp <= 0`), `is_cell_blocked()` retourne `false` au tick suivant, et le monstre redevient éligible à une avancée directe ou à une nouvelle sélection de comportement.
+- **Obstacles déjà détruits** : `is_cell_blocked() = false` → l'avancée directe réussit avant que `resolve()` soit appelé ; `destroy_obstacle` n'est jamais sollicité sur un obstacle détruit.
+
 **Profils par monstre dans MONSTER_DEFS** :
 
 | Monstre | `obstacle_behaviors` | `behavior_weights` | Mode |
 |---|---|---|---|
 | Gobelin vert (`"g"`) | `[WAIT]` | `{}` | Ordonné (trivial) |
-| Gobelin bleu (`"b"`) | `[SIDESTEP_LEFT, SIDESTEP_RIGHT, WAIT]` | `{left:40, right:40, wait:20}` | Pondéré, pas de biais gauche |
-| Gobelin rouge (`"r"`) | `[SIDESTEP_RANDOM, JUMP_OBSTACLE, WAIT]` | `{random:50, jump:30, wait:20}` | Pondéré, favorise le mouvement |
+| Gobelin bleu (`"b"`) | `[SIDESTEP_LEFT, SIDESTEP_RIGHT, DESTROY_OBSTACLE, WAIT]` | `{left:35, right:35, destroy:15, wait:15}` | Pondéré, favorise le contournement |
+| Gobelin rouge (`"r"`) | `[SIDESTEP_RANDOM, JUMP_OBSTACLE, DESTROY_OBSTACLE, WAIT]` | `{random:40, jump:20, destroy:30, wait:10}` | Pondéré, très agressif envers les obstacles |
 | Boss (`"boss_*"`) | `[WAIT]` | `{}` | Ordonné (tient sa lane) |
 
 **Fichiers concernés** :

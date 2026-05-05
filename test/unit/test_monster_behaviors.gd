@@ -121,11 +121,74 @@ func test_priority_first_valid_wins() -> void:
 		[ObstacleBehavior.SIDESTEP_RIGHT, ObstacleBehavior.SIDESTEP_LEFT], 4, 2, _state)
 	assert_eq(result["lane"], 1, "droite bloquée → premier valide = gauche → lane 1")
 
-# ── destroy_obstacle (toujours réservé) ──────────────────────────
+# ── destroy_obstacle ─────────────────────────────────────────────
 
-func test_destroy_obstacle_placeholder_skipped() -> void:
+func test_destroy_obstacle_invalid_when_no_obstacle_in_path() -> void:
+	# Aucun obstacle en row+1 → destroy_obstacle invalide → wait
 	var result = ObstacleBehavior.resolve([ObstacleBehavior.DESTROY_OBSTACLE], 4, 2, _state)
-	assert_eq(result["action"], "wait", "destroy_obstacle (réservé) → ignoré → wait")
+	assert_eq(result["action"], "wait", "aucun obstacle en row+1 → destroy_obstacle invalide → wait")
+
+func test_destroy_obstacle_invalid_when_obstacle_indestructible() -> void:
+	_state.set_obstacle(5, 2, ObstacleData.make_wall())
+	var result = ObstacleBehavior.resolve([ObstacleBehavior.DESTROY_OBSTACLE], 4, 2, _state)
+	assert_eq(result["action"], "wait", "obstacle indestructible en row+1 → destroy_obstacle invalide → wait")
+
+func test_destroy_obstacle_valid_when_destructible_obstacle_blocks() -> void:
+	_state.set_obstacle(5, 2, ObstacleData.make_destructible_wall(10))
+	var result = ObstacleBehavior.resolve([ObstacleBehavior.DESTROY_OBSTACLE], 4, 2, _state)
+	assert_eq(result["action"], "destroy_obstacle", "obstacle destructible en row+1 → action destroy_obstacle")
+	assert_eq(result["row"],    5,                  "cible = row + 1")
+	assert_eq(result["lane"],   2,                  "même lane")
+
+func test_destroy_obstacle_invalid_at_last_row() -> void:
+	# row 7 → row+1 = 8, hors grille → invalide
+	_state.set_obstacle(7, 2, ObstacleData.make_destructible_wall(10))
+	var result = ObstacleBehavior.resolve([ObstacleBehavior.DESTROY_OBSTACLE], 7, 2, _state)
+	assert_eq(result["action"], "wait", "row+1 hors grille → destroy_obstacle invalide → wait")
+
+func test_destroy_obstacle_in_weighted_selection_can_be_chosen() -> void:
+	# Sidesteps bloqués + obstacle destructible → seul destroy_obstacle valide parmi les comportements de mouvement
+	_state.set_cell_occupied(4, 1, "blocker")
+	_state.set_cell_occupied(4, 3, "blocker")
+	_state.set_obstacle(5, 2, ObstacleData.make_destructible_wall(10))
+	var behaviors = [ObstacleBehavior.SIDESTEP_LEFT, ObstacleBehavior.SIDESTEP_RIGHT, ObstacleBehavior.DESTROY_OBSTACLE, ObstacleBehavior.WAIT]
+	var weights = {
+		ObstacleBehavior.SIDESTEP_LEFT:    40,
+		ObstacleBehavior.SIDESTEP_RIGHT:   40,
+		ObstacleBehavior.DESTROY_OBSTACLE: 20,
+		ObstacleBehavior.WAIT:             0,
+	}
+	var result = ObstacleBehavior.resolve(behaviors, 4, 2, _state, 0, weights)
+	assert_eq(result["action"], "destroy_obstacle",
+		"sidesteps invalides + wait=0 + obstacle destructible → destroy_obstacle sélectionné")
+
+func test_destroy_obstacle_not_chosen_when_weight_zero() -> void:
+	_state.set_obstacle(5, 2, ObstacleData.make_destructible_wall(10))
+	var behaviors = [ObstacleBehavior.DESTROY_OBSTACLE, ObstacleBehavior.WAIT]
+	var weights = {ObstacleBehavior.DESTROY_OBSTACLE: 0, ObstacleBehavior.WAIT: 10}
+	for seed in range(0, 20):
+		var result = ObstacleBehavior.resolve(behaviors, 4, 2, _state, seed, weights)
+		assert_eq(result["action"], "wait",
+			"poids destroy_obstacle=0 → jamais sélectionné (seed=%d)" % seed)
+
+func test_destroy_obstacle_integration_applies_damage() -> void:
+	# Flux complet : resolve → damage_obstacle → obstacle endommagé
+	_state.set_obstacle(5, 2, ObstacleData.make_destructible_wall(10))
+	var result = ObstacleBehavior.resolve([ObstacleBehavior.DESTROY_OBSTACLE], 4, 2, _state)
+	assert_eq(result["action"], "destroy_obstacle")
+	# Simule ce que game.gd fait : inflige 8 dégâts (valeur arbitraire de test)
+	_state.damage_obstacle(result["row"], result["lane"], 8)
+	var obs = _state.get_obstacle(5, 2)
+	assert_eq(obs.hp, 2, "10 hp - 8 dégâts = 2 hp restants")
+	assert_true(_state.is_cell_blocked(5, 2), "obstacle survivant reste bloquant")
+
+func test_destroy_obstacle_integration_obstacle_destroyed_unblocks_cell() -> void:
+	# Flux complet : obstacle destructible → dégâts fatals → cellule débloquée
+	_state.set_obstacle(5, 2, ObstacleData.make_destructible_wall(5))
+	_state.damage_obstacle(5, 2, 10)  # overkill
+	assert_true(_state.is_obstacle_destroyed(5, 2),  "obstacle détruit après overkill")
+	assert_false(_state.is_cell_blocked(5, 2),       "cellule débloquée après destruction")
+	assert_true(_state.has_obstacle(5, 2),           "obstacle toujours présent en grille (has_obstacle = true)")
 
 # ── jump_obstacle : initiation ────────────────────────────────────
 
@@ -233,15 +296,17 @@ func test_green_goblin_only_waits() -> void:
 
 func test_blue_goblin_tries_sidestep() -> void:
 	var behaviors = GameData.MONSTER_DEFS["b"]["obstacle_behaviors"]
-	assert_true(behaviors.has(ObstacleBehavior.SIDESTEP_LEFT),  "gobelin bleu : sidestep_left autorisé")
-	assert_true(behaviors.has(ObstacleBehavior.SIDESTEP_RIGHT), "gobelin bleu : sidestep_right autorisé")
-	assert_true(behaviors.has(ObstacleBehavior.WAIT),           "gobelin bleu : wait en fallback")
+	assert_true(behaviors.has(ObstacleBehavior.SIDESTEP_LEFT),    "gobelin bleu : sidestep_left autorisé")
+	assert_true(behaviors.has(ObstacleBehavior.SIDESTEP_RIGHT),   "gobelin bleu : sidestep_right autorisé")
+	assert_true(behaviors.has(ObstacleBehavior.DESTROY_OBSTACLE), "gobelin bleu : destroy_obstacle autorisé")
+	assert_true(behaviors.has(ObstacleBehavior.WAIT),             "gobelin bleu : wait en fallback")
 
-func test_red_goblin_uses_random_sidestep_and_jump() -> void:
+func test_red_goblin_uses_random_sidestep_jump_and_destroy() -> void:
 	var behaviors = GameData.MONSTER_DEFS["r"]["obstacle_behaviors"]
-	assert_true(behaviors.has(ObstacleBehavior.SIDESTEP_RANDOM), "gobelin rouge : sidestep_random autorisé")
-	assert_true(behaviors.has(ObstacleBehavior.JUMP_OBSTACLE),   "gobelin rouge : jump_obstacle autorisé")
-	assert_true(behaviors.has(ObstacleBehavior.WAIT),            "gobelin rouge : wait en fallback")
+	assert_true(behaviors.has(ObstacleBehavior.SIDESTEP_RANDOM),  "gobelin rouge : sidestep_random autorisé")
+	assert_true(behaviors.has(ObstacleBehavior.JUMP_OBSTACLE),    "gobelin rouge : jump_obstacle autorisé")
+	assert_true(behaviors.has(ObstacleBehavior.DESTROY_OBSTACLE), "gobelin rouge : destroy_obstacle autorisé")
+	assert_true(behaviors.has(ObstacleBehavior.WAIT),             "gobelin rouge : wait en fallback")
 
 func test_bosses_only_wait() -> void:
 	for boss_id in ["boss_g", "boss_b", "boss_r"]:

@@ -72,13 +72,14 @@ const MONSTER_DEFS = {
 		"is_boss":            false,
 		"tags":               [],
 		"sprite_path":        "res://assets/characters/goblin_blue.svg",
-		# Comportement rusé : essaie de contourner des deux côtés avant d'attendre
-		# Poids équilibrés gauche/droite (40/40) ; wait rare (20) pour conserver la pression
-		"obstacle_behaviors": [ObstacleBehavior.SIDESTEP_LEFT, ObstacleBehavior.SIDESTEP_RIGHT, ObstacleBehavior.WAIT],
+		# Comportement rusé : contourne des deux côtés, attaque les obstacles destructibles, attend en dernier recours
+		# Poids favorisent le mouvement latéral (35/35) ; destruction modérée (15) ; wait rare (15)
+		"obstacle_behaviors": [ObstacleBehavior.SIDESTEP_LEFT, ObstacleBehavior.SIDESTEP_RIGHT, ObstacleBehavior.DESTROY_OBSTACLE, ObstacleBehavior.WAIT],
 		"behavior_weights": {
-			ObstacleBehavior.SIDESTEP_LEFT:  40,
-			ObstacleBehavior.SIDESTEP_RIGHT: 40,
-			ObstacleBehavior.WAIT:           20,
+			ObstacleBehavior.SIDESTEP_LEFT:    35,
+			ObstacleBehavior.SIDESTEP_RIGHT:   35,
+			ObstacleBehavior.DESTROY_OBSTACLE: 15,
+			ObstacleBehavior.WAIT:             15,
 		},
 		"palette": {
 			"main": Color(0.18, 0.30, 0.78),
@@ -98,13 +99,14 @@ const MONSTER_DEFS = {
 		"is_boss":            false,
 		"tags":               [],
 		"sprite_path":        "res://assets/characters/goblin_red.svg",
-		# Comportement agressif : contourne aléatoirement, saute si impossible, sinon attend
-		# Poids favorisent le mouvement (80%) ; saut plus rare que sidestep (30 vs 50)
-		"obstacle_behaviors": [ObstacleBehavior.SIDESTEP_RANDOM, ObstacleBehavior.JUMP_OBSTACLE, ObstacleBehavior.WAIT],
+		# Comportement agressif : contourne, saute ou détruit les obstacles destructibles, attend en dernier recours
+		# Poids favorisent fortement le mouvement (90%) ; destroy_obstacle notable (30) ; wait minimal (10)
+		"obstacle_behaviors": [ObstacleBehavior.SIDESTEP_RANDOM, ObstacleBehavior.JUMP_OBSTACLE, ObstacleBehavior.DESTROY_OBSTACLE, ObstacleBehavior.WAIT],
 		"behavior_weights": {
-			ObstacleBehavior.SIDESTEP_RANDOM: 50,
-			ObstacleBehavior.JUMP_OBSTACLE:   30,
-			ObstacleBehavior.WAIT:            20,
+			ObstacleBehavior.SIDESTEP_RANDOM:  40,
+			ObstacleBehavior.JUMP_OBSTACLE:    20,
+			ObstacleBehavior.DESTROY_OBSTACLE: 30,
+			ObstacleBehavior.WAIT:             10,
 		},
 		"palette": {
 			"main": Color(0.80, 0.12, 0.08),
