@@ -44,9 +44,22 @@ static func resolve(
 					return {"action": "move", "row": row, "lane": dir_a}
 				if _sidestep_valid(row, dir_b, board_state):
 					return {"action": "move", "row": row, "lane": dir_b}
-			# JUMP_OBSTACLE, DESTROY_OBSTACLE : non implémentés, passés silencieusement
+			JUMP_OBSTACLE:
+				# Franchit la cellule bloquante (row+1) pour atterrir en row+2.
+				# Ne réserve pas la cellule cible ; revalidation à la résolution finale.
+				var target_row = row + 2
+				if target_row < BoardGeometry.GRID_ROWS:
+					return {"action": "jump_start", "row": target_row, "lane": lane}
+			# DESTROY_OBSTACLE : non implémenté, passé silencieusement
 	# Aucun comportement autorisé n'a produit un mouvement valide → attente
 	return {"action": "wait"}
+
+# Revalidation finale d'un atterrissage de saut.
+# Appelée au tick de résolution (tick 3) : retourne true si le saut peut s'appliquer.
+static func validate_jump_landing(row: int, lane: int, board_state: BoardState) -> bool:
+	if not BoardGeometry.is_valid_cell(row, lane):
+		return false
+	return board_state.is_cell_free(row, lane) and not board_state.is_cell_blocked(row, lane)
 
 # Vérifie qu'une cellule latérale est dans les bornes de la grille,
 # libre d'occupant et non bloquée par obstacle.

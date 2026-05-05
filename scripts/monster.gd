@@ -18,6 +18,12 @@ var obstacle_behaviors   : Array = [ObstacleBehavior.WAIT]
 var palette              : Dictionary = {}
 var tags                 : Array = []
 
+# État de saut multi-ticks (jump_obstacle)
+# 0 = libre ; > 0 = saut en cours (move periods restants avant résolution)
+var jump_ticks_remaining : int = 0
+var jump_target_row      : int = -1
+var jump_target_lane     : int = -1
+
 func take_damage(amount: int) -> void:
 	hp -= amount
 	_on_damage_taken()
@@ -57,6 +63,21 @@ func setup_from_def(monster_id: String, def: Dictionary) -> void:
 		apply_palette(palette)
 	if def.has("sprite_path"):
 		_apply_sprite(def["sprite_path"])
+
+# API saut multi-ticks (jump_obstacle) ───────────────────────────
+
+func start_jump(target_row: int, target_lane: int) -> void:
+	jump_ticks_remaining = 2
+	jump_target_row  = target_row
+	jump_target_lane = target_lane
+
+func is_jumping() -> bool:
+	return jump_ticks_remaining > 0
+
+# Décrémente le compteur de saut. Appelé à chaque move period pendant le saut.
+func tick_jump() -> void:
+	if jump_ticks_remaining > 0:
+		jump_ticks_remaining -= 1
 
 # Point d'extension comportement — appelé à chaque tick de mouvement.
 # Comportements spéciaux (ex: "charge", "split") surchargent cette méthode.

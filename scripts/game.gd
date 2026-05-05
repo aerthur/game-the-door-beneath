@@ -174,6 +174,24 @@ func _do_tick():
 			if m.move_countdown_ticks > 0: continue
 			m.move_countdown_ticks = m.move_period_ticks
 
+			# Saut multi-ticks en cours : décrémente et résout si terminé
+			if m.is_jumping():
+				m.tick_jump()
+				if m.jump_ticks_remaining == 0:
+					var tr = m.jump_target_row
+					var tl = m.jump_target_lane
+					m.jump_target_row  = -1
+					m.jump_target_lane = -1
+					if ObstacleBehavior.validate_jump_landing(tr, tl, board_state):
+						board_state.set_cell_occupied(tr, tl, m)
+						board_state.clear_cell(r, l)
+						m.grid_row  = tr
+						m.grid_lane = tl
+						moved_this_tick[m] = true
+						var tw = create_tween()
+						tw.tween_property(m, "position", grid_pos(tr, tl), 0.4)
+				continue
+
 			var new_row = r + 1
 			if new_row >= BoardGeometry.GRID_ROWS:
 				var dmg   = m.damage
@@ -214,6 +232,8 @@ func _do_tick():
 						m.grid_lane = dst_lane
 						var tw = create_tween()
 						tw.tween_property(m, "position", grid_pos(dst_row, dst_lane), 0.25)
+					elif action["action"] == "jump_start":
+						m.start_jump(action["row"], action["lane"])
 					# else: "wait" — pas de mouvement ce tick
 	# Traitement des respawns en attente après les déplacements
 	_execute_respawn_results(enemies.tick_pending_respawns())

@@ -90,8 +90,8 @@ const MONSTER_DEFS = {
 		"is_boss":            false,
 		"tags":               [],
 		"sprite_path":        "res://assets/characters/goblin_red.svg",
-		# Comportement agressif : contourne aléatoirement, ne reste jamais bloqué longtemps
-		"obstacle_behaviors": [ObstacleBehavior.SIDESTEP_RANDOM, ObstacleBehavior.WAIT],
+		# Comportement agressif : contourne aléatoirement, saute si impossible, sinon attend
+		"obstacle_behaviors": [ObstacleBehavior.SIDESTEP_RANDOM, ObstacleBehavior.JUMP_OBSTACLE, ObstacleBehavior.WAIT],
 		"palette": {
 			"main": Color(0.80, 0.12, 0.08),
 			"dark": Color(0.72, 0.10, 0.08),
