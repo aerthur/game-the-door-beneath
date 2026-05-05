@@ -318,7 +318,7 @@ func show_level_up(choices: Array):
 		vb.add_child(dmg_lbl)
 
 		var btn = Button.new()
-		btn.text = "Choisir"
+		btn.text = "Choisir  [ %d ]" % (i + 1)
 		btn.pressed.connect(_on_choice_selected.bind(i))
 		if _serif:
 			_style_ghost_btn(btn, _serif, C_TEXT, 12)
@@ -328,11 +328,21 @@ func show_level_up(choices: Array):
 		lvlup_hbox.add_child(card)
 
 func _on_choice_selected(index: int):
+	if index < 0 or index >= _current_choices.size(): return
 	var game = get_tree().get_first_node_in_group("game")
 	game.apply_level_up_choice(_current_choices[index])
 
 func hide_level_up():
 	lvlup_panel.visible = false
+
+# ── Sélection clavier du level-up (touches 1 / 2 / 3) ───────────
+func _unhandled_input(event: InputEvent) -> void:
+	if not lvlup_panel.visible: return
+	if not (event is InputEventKey) or not event.pressed or event.echo: return
+	match event.keycode:
+		KEY_1: _on_choice_selected(0)
+		KEY_2: _on_choice_selected(1)
+		KEY_3: _on_choice_selected(2)
 
 # ── Game Over ────────────────────────────────────────────────────
 func show_game_over(s: int, r: int):
