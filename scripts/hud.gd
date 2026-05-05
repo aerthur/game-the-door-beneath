@@ -156,10 +156,20 @@ func update_weapons(weapons: Array):
 		hb.add_theme_constant_override("separation", 4)
 		vb.add_child(hb)
 
-		var icon_lbl = Label.new()
-		icon_lbl.text = icon_str
-		icon_lbl.add_theme_font_size_override("font_size", 16)
-		hb.add_child(icon_lbl)
+		var icon_path : String = def.get("icon_path", "")
+		if icon_path != "":
+			var tex_rect = TextureRect.new()
+			tex_rect.custom_minimum_size = Vector2(16, 16)
+			tex_rect.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+			tex_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			tex_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			tex_rect.texture = load(icon_path)
+			hb.add_child(tex_rect)
+		else:
+			var icon_lbl = Label.new()
+			icon_lbl.text = icon_str
+			icon_lbl.add_theme_font_size_override("font_size", 16)
+			hb.add_child(icon_lbl)
 
 		var name_lbl = Label.new()
 		name_lbl.text = "%s  Nv.%d" % [def.name, w.level]
@@ -257,24 +267,21 @@ func show_level_up(choices: Array):
 			badge.add_theme_font_override("font", _serif)
 		vb.add_child(badge)
 
-		var tex_rect = TextureRect.new()
-		tex_rect.custom_minimum_size = Vector2(48, 48)
-		tex_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		tex_rect.visible = false
-		vb.add_child(tex_rect)
-
-		var icon_lbl = Label.new()
-		var icon_str = def.get("icon", "")
-		var icon_path = def.get("icon_path", "")
-		if icon_path != "":
-			tex_rect.texture = load(icon_path)
-			tex_rect.visible = true
-			icon_lbl.visible = false
+		var icon_path_lv : String = def.get("icon_path", "")
+		if icon_path_lv != "":
+			var tex_rect = TextureRect.new()
+			tex_rect.custom_minimum_size = Vector2(48, 48)
+			tex_rect.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+			tex_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			tex_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			tex_rect.texture = load(icon_path_lv)
+			vb.add_child(tex_rect)
 		else:
-			icon_lbl.text = icon_str
-		icon_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		icon_lbl.add_theme_font_size_override("font_size", 48)
-		vb.add_child(icon_lbl)
+			var icon_lbl = Label.new()
+			icon_lbl.text = def.get("icon", "")
+			icon_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			icon_lbl.add_theme_font_size_override("font_size", 48)
+			vb.add_child(icon_lbl)
 
 		var name_lbl = Label.new()
 		name_lbl.text = def.name

@@ -1,76 +1,10 @@
-[gd_scene format=3]
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/player.gd" id="1"]
 
 [node name="Player" type="Node2D"]
+script = ExtResource("1")
 
-[node name="Legs" type="ColorRect" parent="."]
-offset_left = -10.0
-offset_top = 10.0
-offset_right = 10.0
-offset_bottom = 30.0
-color = Color(0.22, 0.18, 0.12, 1)
-
-[node name="Tunic" type="ColorRect" parent="."]
-offset_left = -14.0
-offset_top = -18.0
-offset_right = 14.0
-offset_bottom = 12.0
-color = Color(0.28, 0.42, 0.22, 1)
-
-[node name="Belt" type="ColorRect" parent="."]
-offset_left = -14.0
-offset_top = 8.0
-offset_right = 14.0
-offset_bottom = 14.0
-color = Color(0.45, 0.30, 0.12, 1)
-
-[node name="Head" type="ColorRect" parent="."]
-offset_left = -10.0
-offset_top = -34.0
-offset_right = 10.0
-offset_bottom = -18.0
-color = Color(0.88, 0.72, 0.55, 1)
-
-[node name="Hood" type="ColorRect" parent="."]
-offset_left = -13.0
-offset_top = -40.0
-offset_right = 13.0
-offset_bottom = -24.0
-color = Color(0.20, 0.32, 0.18, 1)
-
-[node name="HoodTip" type="ColorRect" parent="."]
-offset_left = -4.0
-offset_top = -48.0
-offset_right = 4.0
-offset_bottom = -38.0
-color = Color(0.20, 0.32, 0.18, 1)
-
-[node name="Bow" type="Line2D" parent="."]
-points = PackedVector2Array(-22, -28, -26, -18, -28, -6, -26, 6, -22, 16)
-width = 4.0
-default_color = Color(0.55, 0.35, 0.15, 1)
-
-[node name="BowString" type="Line2D" parent="."]
-points = PackedVector2Array(-22, -28, -16, -6, -22, 16)
-width = 1.5
-default_color = Color(0.85, 0.80, 0.60, 1)
-
-[node name="Quiver" type="ColorRect" parent="."]
-offset_left = 12.0
-offset_top = -24.0
-offset_right = 20.0
-offset_bottom = 8.0
-color = Color(0.45, 0.28, 0.10, 1)
-
-[node name="ArrowInQuiver" type="ColorRect" parent="."]
-offset_left = 13.0
-offset_top = -32.0
-offset_right = 16.0
-offset_bottom = -22.0
-color = Color(0.70, 0.55, 0.20, 1)
-
-[node name="Eye" type="ColorRect" parent="."]
-offset_left = -6.0
-offset_top = -30.0
-offset_right = -1.0
-offset_bottom = -25.0
-color = Color(0.15, 0.10, 0.05, 1)
+[node name="Sprite" type="Sprite2D" parent="."]
+scale = Vector2(1.3, 1.3)
+centered = true

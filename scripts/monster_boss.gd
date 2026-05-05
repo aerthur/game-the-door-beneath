@@ -18,8 +18,8 @@ func _create_health_bar():
 	health_bar = ProgressBar.new()
 	health_bar.max_value       = hp_max
 	health_bar.value           = hp
-	health_bar.position        = Vector2(-55, -120)
-	health_bar.size            = Vector2(110, 5)
+	health_bar.position        = Vector2(-42, -60)
+	health_bar.size            = Vector2(84, 6)
 	health_bar.show_percentage = false
 	add_child(health_bar)
 
@@ -41,7 +41,7 @@ func _create_health_bar():
 func _create_crown():
 	var crown = Label.new()
 	crown.text     = "♛"
-	crown.position = Vector2(-14, -88)
+	crown.position = Vector2(-10, -76)
 	crown.add_theme_color_override("font_color", Color(1.0, 0.85, 0.0))
 	crown.add_theme_font_size_override("font_size", 22)
 	add_child(crown)
