@@ -21,3 +21,13 @@ static func make_wall() -> ObstacleData:
 	o.blocks_los      = true
 	o.destructibility = "indestructible"
 	return o
+
+static func make_destructible_wall(initial_hp: int) -> ObstacleData:
+	var o = ObstacleData.new()
+	o.kind            = "wall"
+	o.blocks_movement = true
+	o.blocks_occupancy= true
+	o.destructibility = "destructible"
+	o.hp              = initial_hp
+	o.max_hp          = initial_hp
+	return o

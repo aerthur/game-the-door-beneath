@@ -83,3 +83,23 @@ func test_default_obstacle_blocks_movement_and_occupancy() -> void:
 func test_default_obstacle_does_not_block_los() -> void:
 	var obs := ObstacleData.new()
 	assert_false(obs.blocks_los, "blocks_los = false par défaut")
+
+# ── Tests make_destructible_wall (issue #74) ──────────────────────────
+func test_make_destructible_wall_destructibility() -> void:
+	var obs := ObstacleData.make_destructible_wall(30)
+	assert_eq(obs.destructibility, "destructible", "factory : obstacle destructible")
+
+func test_make_destructible_wall_hp() -> void:
+	var obs := ObstacleData.make_destructible_wall(30)
+	assert_eq(obs.hp, 30, "factory : hp = 30")
+	assert_eq(obs.max_hp, 30, "factory : max_hp = 30")
+
+func test_make_destructible_wall_blocks_by_default() -> void:
+	var obs := ObstacleData.make_destructible_wall(30)
+	assert_true(obs.blocks_movement, "factory : bloque le mouvement")
+	assert_true(obs.blocks_occupancy, "factory : bloque l'occupation")
+
+func test_indestructible_wall_has_no_hp() -> void:
+	var wall := ObstacleData.make_wall()
+	assert_eq(wall.hp, -1, "mur indestructible : hp = -1")
+	assert_eq(wall.max_hp, -1, "mur indestructible : max_hp = -1")

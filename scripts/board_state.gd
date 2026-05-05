@@ -66,3 +66,30 @@ func is_cell_blocked(row: int, col: int) -> bool:
 	if obs == null:
 		return false
 	return obs.blocks_movement or obs.blocks_occupancy
+
+# ── API Destruction d'obstacles ──────────────────────────────────────
+# Règle d'implémentation : un obstacle détruit reste en grille (has_obstacle = true)
+# mais ses champs blocks_movement et blocks_occupancy sont mis à false.
+# is_obstacle_destroyed() retourne true, is_cell_blocked() retourne false.
+# Les obstacles indestructibles ignorent les dégâts.
+
+func is_obstacle_destructible(row: int, col: int) -> bool:
+	var obs: ObstacleData = _obstacles[row][col]
+	if obs == null:
+		return false
+	return obs.destructibility == "destructible"
+
+func is_obstacle_destroyed(row: int, col: int) -> bool:
+	var obs: ObstacleData = _obstacles[row][col]
+	if obs == null:
+		return false
+	return obs.destructibility == "destructible" and obs.hp <= 0
+
+func damage_obstacle(row: int, col: int, amount: int) -> void:
+	var obs: ObstacleData = _obstacles[row][col]
+	if obs == null or obs.destructibility != "destructible":
+		return
+	obs.hp -= amount
+	if obs.hp <= 0:
+		obs.blocks_movement  = false
+		obs.blocks_occupancy = false
