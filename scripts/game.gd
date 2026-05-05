@@ -504,4 +504,7 @@ func _on_player_game_over():
 
 # ── Input (délégué à player_ctrl) ────────────────────────────────
 func _input(event: InputEvent):
+	# [DEBUG] Touche D — slot de debug, brancher ici les tests ponctuels
+	#if event is InputEventKey and event.pressed and event.keycode == KEY_D:
+	#	_add_xp(500)  # test chaînage multi-level-up
 	player_ctrl.handle_input(event, game_over, leveling_up, room_clear)
