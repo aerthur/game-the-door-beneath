@@ -89,3 +89,63 @@ func test_obstacle_blocking_nothing_not_blocked() -> void:
 	obs.blocks_occupancy = false
 	_state.set_obstacle(0, 0, obs)
 	assert_false(_state.is_cell_blocked(0, 0), "obstacle sans blocage → is_cell_blocked = false")
+
+# ── Tests destruction d'obstacles (issue #74) ─────────────────────────
+func test_destructible_obstacle_is_blocked_before_destruction() -> void:
+	_state.set_obstacle(1, 1, ObstacleData.make_destructible_wall(30))
+	assert_true(_state.is_cell_blocked(1, 1), "obstacle destructible bloque avant destruction")
+
+func test_is_obstacle_destructible_true() -> void:
+	_state.set_obstacle(1, 1, ObstacleData.make_destructible_wall(30))
+	assert_true(_state.is_obstacle_destructible(1, 1), "obstacle destructible reconnu")
+
+func test_is_obstacle_destructible_false_for_wall() -> void:
+	_state.set_obstacle(1, 1, ObstacleData.make_wall())
+	assert_false(_state.is_obstacle_destructible(1, 1), "mur indestructible non destructible")
+
+func test_is_obstacle_destructible_false_without_obstacle() -> void:
+	assert_false(_state.is_obstacle_destructible(0, 0), "pas d'obstacle = pas destructible")
+
+func test_is_obstacle_destroyed_false_before_damage() -> void:
+	_state.set_obstacle(2, 2, ObstacleData.make_destructible_wall(30))
+	assert_false(_state.is_obstacle_destroyed(2, 2), "obstacle pas détruit avant dégâts")
+
+func test_is_obstacle_destroyed_false_without_obstacle() -> void:
+	assert_false(_state.is_obstacle_destroyed(0, 0), "pas d'obstacle = pas détruit")
+
+func test_damage_obstacle_reduces_hp() -> void:
+	_state.set_obstacle(2, 2, ObstacleData.make_destructible_wall(30))
+	_state.damage_obstacle(2, 2, 10)
+	assert_eq(_state.get_obstacle(2, 2).hp, 20, "hp réduit à 20 après 10 dégâts")
+	assert_true(_state.is_cell_blocked(2, 2), "encore bloqué à 20 hp")
+	assert_false(_state.is_obstacle_destroyed(2, 2), "pas encore détruit")
+
+func test_damage_obstacle_destroys_at_zero_hp() -> void:
+	_state.set_obstacle(3, 3, ObstacleData.make_destructible_wall(30))
+	_state.damage_obstacle(3, 3, 30)
+	assert_false(_state.is_cell_blocked(3, 3), "cellule non bloquée après destruction")
+	assert_true(_state.is_obstacle_destroyed(3, 3), "obstacle marqué détruit")
+	assert_true(_state.has_obstacle(3, 3), "obstacle toujours présent (état non bloquant)")
+
+func test_damage_obstacle_overkill() -> void:
+	_state.set_obstacle(0, 0, ObstacleData.make_destructible_wall(10))
+	_state.damage_obstacle(0, 0, 999)
+	assert_false(_state.is_cell_blocked(0, 0), "cellule non bloquée après overkill")
+	assert_true(_state.is_obstacle_destroyed(0, 0), "obstacle détruit par overkill")
+	assert_true(_state.get_obstacle(0, 0).hp <= 0, "hp négatif (overkill ok)")
+
+func test_damage_obstacle_indestructible_ignored() -> void:
+	_state.set_obstacle(1, 0, ObstacleData.make_wall())
+	_state.damage_obstacle(1, 0, 1000)
+	assert_true(_state.is_cell_blocked(1, 0), "mur indestructible reste bloqué")
+	assert_false(_state.is_obstacle_destroyed(1, 0), "mur indestructible non détruit")
+
+func test_damage_obstacle_no_obstacle_no_error() -> void:
+	_state.damage_obstacle(0, 0, 10)
+	assert_false(_state.has_obstacle(0, 0), "cellule vide reste vide après damage")
+
+func test_partial_damage_keeps_blocking() -> void:
+	_state.set_obstacle(4, 4, ObstacleData.make_destructible_wall(50))
+	_state.damage_obstacle(4, 4, 25)
+	assert_true(_state.is_cell_blocked(4, 4), "bloqué à mi-chemin")
+	assert_false(_state.is_obstacle_destroyed(4, 4), "pas encore détruit")

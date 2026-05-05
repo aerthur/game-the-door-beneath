@@ -203,9 +203,32 @@ board_state.is_cell_blocked(row, col) -> bool    # true si obstacle bloque mouve
 | `destructibility` | String | `"indestructible"` | `"indestructible"` ou `"destructible"` |
 | `hp` / `max_hp` | int | `-1` | Points de vie si destructible (-1 = non applicable) |
 
-Factory disponible : `ObstacleData.make_wall()` → mur indestructible bloquant tout.
+Factories disponibles :
+- `ObstacleData.make_wall()` → mur indestructible bloquant tout (hp = -1)
+- `ObstacleData.make_destructible_wall(initial_hp)` → mur destructible avec PV (blocks_movement = true, blocks_occupancy = true, destructibility = "destructible")
 
 **Obstacles de test** : `game.gd._setup_test_obstacles()` place deux murs en (row=3, col=1) et (row=3, col=3). Rendu visuel dans `_draw_obstacles()` (overlay ColorRect sur le `$Background`).
+
+### Destruction d'obstacles (issue #74)
+
+La mécanique de destruction est centralisée dans `BoardState`. **Règle d'implémentation : l'obstacle reste présent en grille mais perd ses flags de blocage** (`blocks_movement = false`, `blocks_occupancy = false`). `is_cell_blocked()` retourne naturellement `false`. L'obstacle est conservé pour permettre de distinguer "jamais eu d'obstacle" de "obstacle détruit".
+
+```gdscript
+# Applique des dégâts à l'obstacle (ignoré si indestructible ou absent)
+board_state.damage_obstacle(row, col, amount)
+
+# True si l'obstacle existe et est de type "destructible"
+board_state.is_obstacle_destructible(row, col) -> bool
+
+# True si l'obstacle existe, est destructible, et hp <= 0 (détruit)
+board_state.is_obstacle_destroyed(row, col) -> bool
+```
+
+**Comportement garanti :**
+- Obstacle indestructible → `damage_obstacle` ne fait rien, reste bloquant
+- Obstacle destructible avant destruction → `is_cell_blocked() = true`, `is_obstacle_destroyed() = false`
+- Obstacle destructible à hp <= 0 → `blocks_movement = false`, `blocks_occupancy = false`, `is_cell_blocked() = false`, `is_obstacle_destroyed() = true`, `has_obstacle() = true`
+- Overkill (dégâts > hp) → hp négatif autorisé, état détruit correctement appliqué
 
 ### BoardGeometry — géométrie de la grille
 
