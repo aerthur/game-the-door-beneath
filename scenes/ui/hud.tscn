@@ -210,45 +210,73 @@ offset_bottom = -4.0
 text = "v0.1.0"
 horizontal_alignment = 2
 
-; ── Boutons tactiles (mobile) ──
+; ── Boutons tactiles (mobile) — D-pad bas-droite ──
 [node name="TouchButtons" type="Control" parent="."]
 mouse_filter = 2
 anchor_right = 1.0
 anchor_bottom = 1.0
 
-[node name="BtnLeft" type="Button" parent="TouchButtons"]
-anchor_left = 0.0
-anchor_top = 1.0
-anchor_right = 0.0
-anchor_bottom = 1.0
-offset_left = 4.0
-offset_top = -176.0
-offset_right = 164.0
-offset_bottom = -56.0
-text = "◀"
-
-[node name="BtnRight" type="Button" parent="TouchButtons"]
+; Conteneur D-pad : croix 3×3 de 70px, ancrée bas-droite, au-dessus de la XPZone
+[node name="DPad" type="Control" parent="TouchButtons"]
 anchor_left = 1.0
 anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = -164.0
-offset_top = -176.0
-offset_right = -4.0
-offset_bottom = -56.0
+offset_left = -225.0
+offset_top = -270.0
+offset_right = -15.0
+offset_bottom = -60.0
+mouse_filter = 2
+
+; ↑ Haut — réservé (désactivé, futur)
+[node name="BtnUp" type="Button" parent="TouchButtons/DPad"]
+anchor_left = 0.0
+anchor_top = 0.0
+anchor_right = 0.0
+anchor_bottom = 0.0
+offset_left = 70.0
+offset_top = 0.0
+offset_right = 140.0
+offset_bottom = 70.0
+disabled = true
+text = "▲"
+
+; ◀ Gauche
+[node name="BtnLeft" type="Button" parent="TouchButtons/DPad"]
+anchor_left = 0.0
+anchor_top = 0.0
+anchor_right = 0.0
+anchor_bottom = 0.0
+offset_left = 0.0
+offset_top = 70.0
+offset_right = 70.0
+offset_bottom = 140.0
+text = "◀"
+
+; ▶ Droite
+[node name="BtnRight" type="Button" parent="TouchButtons/DPad"]
+anchor_left = 0.0
+anchor_top = 0.0
+anchor_right = 0.0
+anchor_bottom = 0.0
+offset_left = 140.0
+offset_top = 70.0
+offset_right = 210.0
+offset_bottom = 140.0
 text = "▶"
 
-[node name="BtnNextRoom" type="Button" parent="TouchButtons"]
-visible = false
-anchor_left = 0.5
-anchor_top = 1.0
-anchor_right = 0.5
-anchor_bottom = 1.0
-offset_left = -150.0
-offset_top = -130.0
-offset_right = 150.0
-offset_bottom = -56.0
-text = "🚪 Continuer"
+; ↓ Bas — réservé (désactivé, futur)
+[node name="BtnDown" type="Button" parent="TouchButtons/DPad"]
+anchor_left = 0.0
+anchor_top = 0.0
+anchor_right = 0.0
+anchor_bottom = 0.0
+offset_left = 70.0
+offset_top = 140.0
+offset_right = 140.0
+offset_bottom = 210.0
+disabled = true
+text = "▼"
 
 ; ── Avertissement portrait (mobile) ──
 [node name="PortraitWarning" type="Control" parent="."]
