@@ -452,3 +452,49 @@ func test_all_weights_are_non_negative() -> void:
 		for behavior_id in weights:
 			assert_true(weights[behavior_id] >= 0,
 				"MONSTER_DEFS['%s']['%s'] : poids doit être >= 0" % [monster_id, behavior_id])
+
+# ── cas limites non couverts précédemment ─────────────────────────
+
+func test_build_weight_table_empty_entries_returns_empty() -> void:
+	var table = ObstacleBehavior.build_weight_table([], {})
+	assert_eq(table.size(), 0, "entrées vides → table vide")
+
+func test_select_from_weight_table_empty_table_returns_empty_dict() -> void:
+	var selected = ObstacleBehavior.select_from_weight_table([], 0)
+	assert_eq(selected.size(), 0, "table vide → dictionnaire vide (pas de crash)")
+
+func test_weighted_no_wait_all_invalid_returns_wait() -> void:
+	# Seul comportement = sidestep_left, bloqué, pas de WAIT dans la liste
+	# → _collect_valid vide → resolve retourne wait par défaut
+	_state.set_cell_occupied(4, 1, "blocker")
+	var weights = {ObstacleBehavior.SIDESTEP_LEFT: 99}
+	var result = ObstacleBehavior.resolve(
+		[ObstacleBehavior.SIDESTEP_LEFT], 4, 2, _state, 0, weights)
+	assert_eq(result["action"], "wait",
+		"mode pondéré, tous invalides, pas de WAIT → wait par défaut")
+
+func test_weighted_jump_only_valid_returns_jump_start() -> void:
+	# Les deux sidestep bloqués, seul jump_obstacle valide (row 4 → target 6)
+	_state.set_cell_occupied(4, 1, "blocker")
+	_state.set_cell_occupied(4, 3, "blocker")
+	var behaviors = [ObstacleBehavior.SIDESTEP_LEFT, ObstacleBehavior.SIDESTEP_RIGHT, ObstacleBehavior.JUMP_OBSTACLE]
+	var weights = {
+		ObstacleBehavior.SIDESTEP_LEFT:  40,
+		ObstacleBehavior.SIDESTEP_RIGHT: 40,
+		ObstacleBehavior.JUMP_OBSTACLE:  20,
+	}
+	var result = ObstacleBehavior.resolve(behaviors, 4, 2, _state, 0, weights)
+	assert_eq(result["action"], "jump_start",
+		"seul jump_obstacle valide en mode pondéré → jump_start")
+	assert_eq(result["row"],  6, "cible = row + 2")
+	assert_eq(result["lane"], 2, "même lane")
+
+func test_weighted_result_never_invalid_action_with_jump_in_mix() -> void:
+	# jump_obstacle + sidestep_left disponibles → résultat toujours move ou jump_start
+	var behaviors = [ObstacleBehavior.SIDESTEP_LEFT, ObstacleBehavior.JUMP_OBSTACLE]
+	var weights = {ObstacleBehavior.SIDESTEP_LEFT: 50, ObstacleBehavior.JUMP_OBSTACLE: 50}
+	var valid_actions = ["move", "jump_start"]
+	for seed in range(0, 20):
+		var result = ObstacleBehavior.resolve(behaviors, 4, 2, _state, seed, weights)
+		assert_true(result["action"] in valid_actions,
+			"action = move ou jump_start uniquement (seed=%d)" % seed)
