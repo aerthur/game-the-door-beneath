@@ -100,7 +100,11 @@ func _draw_background():
 
 # Dessine les obstacles de test comme overlays sur les cellules concernées.
 func _draw_obstacles():
-	var test_cells = [[3, 1], [3, 3]]
+	var test_cells = []
+	for r in BoardGeometry.GRID_ROWS:
+		for l in BoardGeometry.GRID_COLUMNS:
+			if board_state.has_obstacle(r, l):
+				test_cells.append([r, l])
 	for coord in test_cells:
 		var r : int = coord[0]
 		var l : int = coord[1]
