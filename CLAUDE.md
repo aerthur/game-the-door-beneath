@@ -548,6 +548,25 @@ Affichées partout (TopBar + panel level-up) : TextureRect si `icon_path` est re
 `_play_door_animation()` anime la porte, affiche le lore, distribue l'XP jackpot.
 `room_clear = true` n'est mis à jour qu'après la fin de l'animation.
 
+### Navigation clavier du panel level-up
+
+Quand `leveling_up = true`, le panel level-up intercepte les inputs via `hud.gd._unhandled_input()` :
+
+| Touche | Action |
+|---|---|
+| ← (`lane_left`) | Sélectionne la carte précédente |
+| → (`lane_right`) | Sélectionne la carte suivante |
+| Entrée / Pavé numérique Entrée | Confirme le choix sélectionné |
+| Espace (`next_room`) | Confirme le choix sélectionné |
+
+La carte active est mise en évidence par une **bordure or vif** (`C_GOLD`) — les autres restent en or atténué (`C_GOLD_DIM`). La première carte est sélectionnée automatiquement à l'ouverture.
+
+**Implémentation** : `_unhandled_input` est utilisé (pas `_input`) car `game.gd._input()` passe d'abord par `player_ctrl.handle_input()` qui retourne immédiatement quand `leveling_up = true` sans marquer l'event comme handled — l'event arrive donc non consommé dans `hud.gd`.
+
+Variables d'état dans `hud.gd` :
+- `_levelup_selected_idx` — index de la carte actuellement mise en évidence
+- `_levelup_cards` — tableau de références aux `PanelContainer` des cartes (rempli dans `show_level_up()`)
+
 ---
 
 ## Les 8 armes (Mode Lanes)
