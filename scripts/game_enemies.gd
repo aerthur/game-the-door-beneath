@@ -156,11 +156,14 @@ func get_respawn_lane(preferred: int, ticks_waited: int, max_ticks: int) -> int:
 	return RESPAWN_GIVE_UP
 
 # Enfile un respawn en attente sur la file d'origine.
-# Appelé par game.gd quand try_spawn_preferred échoue.
-func queue_respawn(lane: int, mtype: String) -> void:
+# def_snapshot : def utilisée à l'instantiation (vide = utilise MONSTER_DEFS[mtype])
+# initial_hp   : PV initiaux (-1 = pleine vie depuis la def)
+func queue_respawn(lane: int, mtype: String, def_snapshot: Dictionary = {}, initial_hp: int = -1) -> void:
 	_pending_respawns.append({
 		"preferred_lane": lane,
 		"mtype":          mtype,
+		"def_snapshot":   def_snapshot,
+		"initial_hp":     initial_hp,
 		"ticks_waited":   0,
 		"max_ticks":      GameData.TICKS_PER_SECOND,
 	})
@@ -184,6 +187,8 @@ func tick_pending_respawns() -> Array:
 				"action":         "spawn",
 				"status":         status,
 				"mtype":          p["mtype"],
+				"def_snapshot":   p.get("def_snapshot", {}),
+				"initial_hp":     p.get("initial_hp", -1),
 				"preferred_lane": p["preferred_lane"],
 				"lane":           target,
 			})
@@ -212,17 +217,31 @@ func try_spawn_preferred(monster_id: String, lane: int) -> bool:
 		return false
 	return spawn_at(monster_id, 0, lane)
 
+# Spawn depuis un def déjà résolu (boss scalé ou monstre avec HP initial précis).
+# initial_hp = -1 → utilise le HP de la def (pleine vie).
+func spawn_at_from_def(monster_id: String, def: Dictionary, row: int, lane: int, initial_hp: int = -1) -> bool:
+	var actual_def := def if not def.is_empty() else GameData.MONSTER_DEFS.get(monster_id, {})
+	if actual_def.is_empty():
+		return false
+	if not board_state.is_cell_free(row, lane) or board_state.is_cell_blocked(row, lane):
+		return false
+	var m = _get_scene(actual_def["scene"]).instantiate()
+	m.setup_from_def(monster_id, actual_def)
+	monsters_node.add_child(m)
+	if initial_hp >= 0:
+		m.apply_initial_hp(initial_hp)
+	m.position  = grid_pos(row, lane)
+	m.grid_row  = row
+	m.grid_lane = lane
+	board_state.set_cell_occupied(row, lane, m)
+	return true
+
+# Tentative immédiate avec def et HP initial optionnel.
+func try_spawn_preferred_from_def(monster_id: String, def: Dictionary, lane: int, initial_hp: int = -1) -> bool:
+	if not board_state.is_cell_free(0, lane) or board_state.is_cell_blocked(0, lane):
+		return false
+	return spawn_at_from_def(monster_id, def, 0, lane, initial_hp)
+
 # Réinitialise la file d'attente (appelé au démarrage de chaque salle).
 func clear_pending_respawns() -> void:
 	_pending_respawns.clear()
-
-# ── Retraite du boss ─────────────────────────────────────────────
-func boss_retreat(boss: Node2D, lane: int):
-	var heal_amount = int(boss.hp_max * 0.3)
-	boss.hp = min(boss.hp_max, boss.hp + heal_amount)
-	boss.update_health_bar()
-	boss.grid_row  = 0
-	boss.grid_lane = lane
-	board_state.set_cell_occupied(0, lane, boss)
-	boss.position  = grid_pos(0, lane)
-	print("[BOSS] Remontée file %d — soigné +%d → %d/%d" % [lane + 1, heal_amount, boss.hp, boss.hp_max])

@@ -9,6 +9,7 @@ var move_period_ticks    : int = 12  # ticks entre chaque déplacement (12 = 1 c
 var move_countdown_ticks : int = 12  # décompte avant le prochain déplacement
 var frozen_ticks         : int = 0   # ticks de gel restants (12 ticks = 1 s)
 var xp_value             : int = 0
+var monster_id           : String = ""  # id de la def (ex: "g", "boss_g") — distinct de monster_type
 var monster_type         : String = ""
 var is_boss              : bool = false
 var grid_row             : int = 0
@@ -19,6 +20,7 @@ var behavior_weights     : Dictionary = {}
 var obstacle_damage      : int = 10  # dégâts infligés aux obstacles (destroy_obstacle)
 var palette              : Dictionary = {}
 var tags                 : Array = []
+var _def_snapshot        : Dictionary = {}  # def complète utilisée à l'instantiation (pour boss scalé)
 
 # État de saut multi-ticks (jump_obstacle)
 # 0 = libre ; > 0 = saut en cours (move periods restants avant résolution)
@@ -45,6 +47,8 @@ func tick_freeze() -> void:
 			modulate = Color.WHITE
 
 func setup_from_def(monster_id: String, def: Dictionary) -> void:
+	self.monster_id = monster_id
+	_def_snapshot   = def  # référence — ne pas modifier l'original
 	# monster_type peut être surchargé dans la def (ex: boss_g → "g")
 	monster_type = def.get("monster_type", monster_id)
 	hp           = def["hp"]
@@ -82,6 +86,12 @@ func is_jumping() -> bool:
 func tick_jump() -> void:
 	if jump_ticks_remaining > 0:
 		jump_ticks_remaining -= 1
+
+# Applique un HP initial après instantiation (preserve_state ou boss scalé).
+# Appelle _on_damage_taken() pour que les sous-classes mettent à jour leurs visuels (barre de vie).
+func apply_initial_hp(hp_val: int) -> void:
+	hp = clamp(hp_val, 1, hp_max)
+	_on_damage_taken()
 
 # Point d'extension comportement — appelé à chaque tick de mouvement.
 # Comportements spéciaux (ex: "charge", "split") surchargent cette méthode.

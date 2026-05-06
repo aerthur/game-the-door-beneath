@@ -263,8 +263,10 @@ func _do_tick():
 
 			var new_row = r + 1
 			if new_row >= BoardGeometry.GRID_ROWS:
-				var dmg   = m.damage
-				var mtype = m.monster_type
+				var dmg          = m.damage
+				var mid          = m.monster_id
+				var cur_hp       = m.hp
+				var def_snapshot = m._def_snapshot
 				board_state.clear_cell(r, l)
 				if m.is_boss:
 					var hit_lanes : Dictionary = {}
@@ -273,12 +275,11 @@ func _do_tick():
 					for tl in hit_lanes:
 						if tl == player_ctrl.player_lane:
 							player_ctrl.hit(dmg)
-					enemies.boss_retreat(m, l)
 				else:
-					m.queue_free()
 					if l == player_ctrl.player_lane:
 						player_ctrl.hit(dmg)
-					_on_monster_escaped(l, mtype)
+				m.queue_free()
+				_on_monster_escaped(l, mid, cur_hp, def_snapshot)
 			else:
 				if board_state.is_cell_free(new_row, l) and not board_state.is_cell_blocked(new_row, l):
 					board_state.set_cell_occupied(new_row, l, m)
@@ -314,28 +315,55 @@ func _do_tick():
 	# Traitement des respawns en attente après les déplacements
 	_execute_respawn_results(enemies.tick_pending_respawns())
 
-func _on_monster_escaped(lane: int, mtype: String) -> void:
-	# Le monstre original est parti → -1
+func _on_monster_escaped(lane: int, monster_id: String, current_hp: int, def_snapshot: Dictionary) -> void:
+	# Le monstre original est sorti → -1
 	monsters_remaining -= 1
-	# Multiplication x2 : 2 remplaçants pré-comptés (+1 chacun)
-	# Net par évasion = -1 + 2 = +1 (1→2, 2→4, etc.)
-	# Si un spawn échoue/abandonne → _execute_respawn_results le décrémente
-	for _i in 2:
+	print("[ESCAPE] File %d id=%s hp=%d — remaining avant spawns: %d" % [lane+1, monster_id, current_hp, monsters_remaining])
+
+	var escape_def : Dictionary = def_snapshot.get("escape_behavior", {})
+	var return_cfg : Dictionary = escape_def.get("return_self",     {"enabled": false})
+	var spawn_cfg  : Dictionary = escape_def.get("spawn_on_escape", {"enabled": false})
+
+	# ── Retour optionnel du monstre sortant ──────────────────────────
+	if return_cfg.get("enabled", false):
+		var hp_max  : int = def_snapshot.get("hp", 1)
+		var ret_hp  : int = EscapeBehavior.calc_return_hp(current_hp, hp_max, return_cfg)
 		spawns_in_flight   += 1
 		monsters_remaining += 1
-		if enemies.try_spawn_preferred(mtype, lane):
+		if enemies.try_spawn_preferred_from_def(monster_id, def_snapshot, lane, ret_hp):
 			spawns_in_flight -= 1
-			print("[ESCAPE] File %d type=%s — spawn immédiat — remaining: %d" % [lane+1, mtype, monsters_remaining])
+			print("[ESCAPE-RETURN] File %d id=%s hp %d/%d — spawn immédiat — remaining: %d" % [lane+1, monster_id, ret_hp, hp_max, monsters_remaining])
 		else:
-			enemies.queue_respawn(lane, mtype)
-			print("[ESCAPE] File %d type=%s — spawn différé (retry %d ticks) — remaining: %d" % [lane+1, mtype, GameData.TICKS_PER_SECOND, monsters_remaining])
+			enemies.queue_respawn(lane, monster_id, def_snapshot, ret_hp)
+			print("[ESCAPE-RETURN] File %d id=%s hp %d/%d — spawn différé — remaining: %d" % [lane+1, monster_id, ret_hp, hp_max, monsters_remaining])
+
+	# ── Spawns additionnels déclenchés par la sortie ─────────────────
+	if spawn_cfg.get("enabled", false):
+		var count       : int   = spawn_cfg.get("count", 0)
+		var spawn_types : Array = spawn_cfg.get("spawn_types", [])
+		for i in count:
+			var spawn_type : String = EscapeBehavior.get_spawn_type_at(spawn_types, i, monster_id)
+			spawns_in_flight   += 1
+			monsters_remaining += 1
+			if enemies.try_spawn_preferred(spawn_type, lane):
+				spawns_in_flight -= 1
+				print("[ESCAPE-SPAWN] File %d type=%s — spawn immédiat — remaining: %d" % [lane+1, spawn_type, monsters_remaining])
+			else:
+				enemies.queue_respawn(lane, spawn_type)
+				print("[ESCAPE-SPAWN] File %d type=%s — spawn différé — remaining: %d" % [lane+1, spawn_type, monsters_remaining])
 
 # Exécute les actions retournées par enemies.tick_pending_respawns().
 func _execute_respawn_results(results: Array) -> void:
 	for r in results:
 		spawns_in_flight -= 1
 		if r["action"] == "spawn":
-			var ok: bool = enemies.spawn_at(r["mtype"], 0, r["lane"])
+			var def_snap : Dictionary = r.get("def_snapshot", {})
+			var init_hp  : int        = r.get("initial_hp", -1)
+			var ok       : bool
+			if init_hp >= 0 and not def_snap.is_empty():
+				ok = enemies.spawn_at_from_def(r["mtype"], def_snap, 0, r["lane"], init_hp)
+			else:
+				ok = enemies.spawn_at(r["mtype"], 0, r["lane"])
 			if not ok:
 				monsters_remaining -= 1
 				print("[RESPAWN] File %d type=%s → spawn échoué — remaining: %d" % [r["preferred_lane"]+1, r["mtype"], monsters_remaining])
