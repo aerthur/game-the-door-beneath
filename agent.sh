@@ -190,81 +190,78 @@ Branche \`$OLD_BRANCH\` supprimée. Réimplémentation au prochain cycle."
   done
 }
 
-# ── Fix : corrige un bug signalé sur une branche feature existante ──
-handle_fix_issues() {
-  local FIX_LIST COUNT
+# ── Fix : logique commune (branche, titre, issue_num, label_type, label_num) ──
+# label_type = "issue" ou "pr" — détermine où retirer le label et où commenter
+_execute_fix() {
+  local FIX_BRANCH="$1"
+  local ISSUE_NUM_CTX="$2"   # numéro issue pour les commentaires (peut = PR num si pas d'issue)
+  local TITLE="$3"
+  local LABEL_TYPE="$4"      # "issue" ou "pr"
+  local LABEL_NUM="$5"       # numéro sur lequel retirer le label
 
-  FIX_LIST=$(gh issue list \
-    --repo "$REPO" \
-    --state open \
-    --label "agent-fix" \
-    --json number,title \
-    --limit 5 2>/dev/null || echo "[]")
+  cd "$REPO_DIR"
 
-  [ "$FIX_LIST" = "[]" ] || [ -z "$FIX_LIST" ] && return 0
-
-  COUNT=$(echo "$FIX_LIST" | python3 -c "import sys,json; print(len(json.load(sys.stdin)))")
-  log "[$COUNT issue(s) marquées agent-fix]"
-
-  for i in $(seq 0 $((COUNT - 1))); do
-    local NUM TITLE SLUG FIX_BRANCH
-
-    NUM=$(echo "$FIX_LIST"   | python3 -c "import sys,json; d=json.load(sys.stdin); print(d[$i]['number'])")
-    TITLE=$(echo "$FIX_LIST" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d[$i]['title'])")
-
-    SLUG=$(echo "$TITLE" \
-      | tr '[:upper:]' '[:lower:]' \
-      | sed 's/\[f\]//gi' \
-      | sed 's/[^a-z0-9]/-/g' \
-      | sed 's/--*/-/g' \
-      | sed 's/^-\|-$//g' \
-      | cut -c1-40)
-    FIX_BRANCH="feature/${NUM}-${SLUG}"
-
-    cd "$REPO_DIR"
-    git fetch origin 2>/dev/null || true
-
-    if ! git ls-remote --exit-code --heads origin "$FIX_BRANCH" > /dev/null 2>&1; then
-      log "Branche $FIX_BRANCH introuvable pour #$NUM — agent-fix ignoré"
-      gh issue comment "$NUM" --repo "$REPO" \
-        --body "⚠️ Branche \`$FIX_BRANCH\` introuvable — impossible de corriger automatiquement. Vérification manuelle nécessaire." 2>/dev/null || true
-      gh issue edit "$NUM" --repo "$REPO" --remove-label "agent-fix" 2>/dev/null || true
-      continue
+  if ! git ls-remote --exit-code --heads origin "$FIX_BRANCH" > /dev/null 2>&1; then
+    log "Branche $FIX_BRANCH introuvable — agent-fix ignoré"
+    if [ "$LABEL_TYPE" = "pr" ]; then
+      gh pr comment "$LABEL_NUM" --repo "$REPO" \
+        --body "⚠️ Branche \`$FIX_BRANCH\` introuvable — impossible de corriger. Vérification manuelle nécessaire." 2>/dev/null || true
+      gh pr edit "$LABEL_NUM" --repo "$REPO" --remove-label "agent-fix" 2>/dev/null || true
+    else
+      gh issue comment "$LABEL_NUM" --repo "$REPO" \
+        --body "⚠️ Branche \`$FIX_BRANCH\` introuvable — impossible de corriger. Vérification manuelle nécessaire." 2>/dev/null || true
+      gh issue edit "$LABEL_NUM" --repo "$REPO" --remove-label "agent-fix" 2>/dev/null || true
     fi
+    return 0
+  fi
 
-    # Récupérer les derniers commentaires pour contexte du bug
-    local BUG_CONTEXT
-    BUG_CONTEXT=$(gh issue view "$NUM" --repo "$REPO" --json comments \
+  # Récupérer les commentaires pour contexte du bug (PR en priorité si dispo, sinon issue)
+  local BUG_CONTEXT=""
+  if [ "$LABEL_TYPE" = "pr" ]; then
+    BUG_CONTEXT=$(gh pr view "$LABEL_NUM" --repo "$REPO" --json comments \
       -q '.comments[-5:] | map("**" + .author.login + "** :\n" + .body) | join("\n\n---\n\n")' \
       2>/dev/null || echo "")
-    if [ -z "$BUG_CONTEXT" ]; then
-      log "⚠️ Aucun commentaire récupéré pour #$NUM — Claude travaillera sans contexte de bug"
-      BUG_CONTEXT="Pas de commentaires disponibles. Analyse le code de la branche pour détecter le problème."
-    else
-      log "Contexte bug récupéré (${#BUG_CONTEXT} caractères)"
-    fi
+  fi
+  if [ -z "$BUG_CONTEXT" ] && [ -n "$ISSUE_NUM_CTX" ]; then
+    BUG_CONTEXT=$(gh issue view "$ISSUE_NUM_CTX" --repo "$REPO" --json comments \
+      -q '.comments[-5:] | map("**" + .author.login + "** :\n" + .body) | join("\n\n---\n\n")' \
+      2>/dev/null || echo "")
+  fi
+  if [ -z "$BUG_CONTEXT" ]; then
+    log "⚠️ Aucun commentaire récupéré — Claude travaillera sans contexte de bug"
+    BUG_CONTEXT="Pas de commentaires disponibles. Analyse le code de la branche pour détecter le problème."
+  else
+    log "Contexte bug récupéré (${#BUG_CONTEXT} caractères)"
+  fi
 
-    log "════════════════════════════════════════"
-    log "Fix bug #$NUM — $TITLE (branche: $FIX_BRANCH)"
-    log "Checkout + pull $FIX_BRANCH..."
-    git checkout "$FIX_BRANCH"
-    git pull origin "$FIX_BRANCH" 2>/dev/null || true
-    log "Branche prête — $(git log --oneline -1)"
+  log "════════════════════════════════════════"
+  log "Fix bug — $TITLE (branche: $FIX_BRANCH)"
+  log "Checkout + pull $FIX_BRANCH..."
+  git checkout "$FIX_BRANCH"
+  git pull origin "$FIX_BRANCH" 2>/dev/null || true
+  log "Branche prête — $(git log --oneline -1)"
 
-    gh issue comment "$NUM" --repo "$REPO" \
+  # Notifier sur l'issue si connue, sinon sur la PR
+  if [ -n "$ISSUE_NUM_CTX" ]; then
+    gh issue comment "$ISSUE_NUM_CTX" --repo "$REPO" \
       --body "🔧 **Correction en cours** — Agent Claude Code prend en charge le bug signalé." 2>/dev/null || true
+  else
+    gh pr comment "$LABEL_NUM" --repo "$REPO" \
+      --body "🔧 **Correction en cours** — Agent Claude Code prend en charge le bug signalé." 2>/dev/null || true
+  fi
 
-    tg "*🔧 Correction bug*
-\`#$NUM\` — $TITLE
+  tg "*🔧 Correction bug*
+\`$TITLE\`
 Branche : \`$FIX_BRANCH\`"
 
-    local FIX_PROMPT="Tu es un développeur de jeux vidéo travaillant sur 'The Door Beneath', roguelite en lanes (Godot 4.6, GDScript 2.0).
+  local REF_DISPLAY="${ISSUE_NUM_CTX:-PR#$LABEL_NUM}"
+  local FIX_PROMPT="Tu es un développeur de jeux vidéo travaillant sur 'The Door Beneath', roguelite en lanes (Godot 4.6, GDScript 2.0).
 
 Lis d'abord CLAUDE.md pour comprendre l'architecture.
 
-## Issue #${NUM} : ${TITLE}
+## ${TITLE}
 
-Un bug a été signalé pendant les tests. Voici le contexte des derniers commentaires de l'issue :
+Un bug a été signalé pendant les tests. Voici le contexte des derniers commentaires :
 
 ${BUG_CONTEXT}
 
@@ -275,66 +272,159 @@ ${BUG_CONTEXT}
 4. Corrige le bug sans casser les autres fonctionnalités
 5. Lance les tests unitaires : godot --headless --script addons/gut/gut_cmdln.gd -gconfig=.gutconfig.json
    - Tous les tests doivent passer. Si certains échouent, corrige jusqu'à ce qu'ils passent tous.
-6. git commit : fix(#${NUM}): description courte du correctif
+6. git commit : fix(#${REF_DISPLAY}): description courte du correctif
 
 Ne lance pas Godot en mode jeu. Commit à la fin."
 
-    local FIX_LOG="/tmp/claude-fix-${NUM}.log"
-    local FIX_START
-    FIX_START=$(date +%s)
-    log "Lancement Claude Code (log: $FIX_LOG)..."
+  local FIX_LOG="/tmp/claude-fix-${LABEL_TYPE}${LABEL_NUM}.log"
+  local FIX_START
+  FIX_START=$(date +%s)
+  log "Lancement Claude Code (log: $FIX_LOG)..."
 
-    set +e
-    claude --dangerously-skip-permissions -p "$FIX_PROMPT" \
-      --allowedTools "Read,Write,Edit,Bash(git *),Bash(ls *),Bash(find *),Bash(godot *),Glob,Grep" \
-      2>&1 | tee "$FIX_LOG"
-    local FIX_EXIT=${PIPESTATUS[0]}
-    set -e
+  set +e
+  claude --dangerously-skip-permissions -p "$FIX_PROMPT" \
+    --allowedTools "Read,Write,Edit,Bash(git *),Bash(ls *),Bash(find *),Bash(godot *),Glob,Grep" \
+    2>&1 | tee "$FIX_LOG"
+  local FIX_EXIT=${PIPESTATUS[0]}
+  set -e
 
-    local FIX_DURATION=$(( $(date +%s) - FIX_START ))
-    log "Fix terminé (exit: $FIX_EXIT, durée: ${FIX_DURATION}s)"
+  local FIX_DURATION=$(( $(date +%s) - FIX_START ))
+  log "Fix terminé (exit: $FIX_EXIT, durée: ${FIX_DURATION}s)"
 
-    if [ "$FIX_EXIT" -ne 0 ]; then
-      if is_token_error "$FIX_LOG"; then
-        log "Tokens épuisés pendant fix #$NUM — arrêt"
-        tg "*⏸ Tokens épuisés (fix bug)*
-Issue \`#$NUM\` — $TITLE
+  if [ "$FIX_EXIT" -ne 0 ]; then
+    if is_token_error "$FIX_LOG"; then
+      log "Tokens épuisés pendant fix — arrêt"
+      tg "*⏸ Tokens épuisés (fix bug)*
+\`$TITLE\`
 Reprise automatique à la prochaine exécution."
-        git checkout "$MAIN_BRANCH" 2>/dev/null || true
-        return 2
-      fi
-      log "Erreur lors du fix #$NUM (exit $FIX_EXIT)"
-      gh issue comment "$NUM" --repo "$REPO" \
-        --body "❌ L'agent a rencontré une erreur lors de la correction (exit $FIX_EXIT). Vérification manuelle nécessaire." 2>/dev/null || true
-      tg "*❌ Erreur fix bug*
-\`#$NUM\` — $TITLE
-Exit code : \`$FIX_EXIT\`"
       git checkout "$MAIN_BRANCH" 2>/dev/null || true
-      continue
+      return 2
     fi
+    log "Erreur fix (exit $FIX_EXIT) — log: $FIX_LOG"
+    local ERR_COMMENT="❌ L'agent a rencontré une erreur (exit $FIX_EXIT). Log : \`$FIX_LOG\`. Vérification manuelle nécessaire."
+    if [ -n "$ISSUE_NUM_CTX" ]; then
+      gh issue comment "$ISSUE_NUM_CTX" --repo "$REPO" --body "$ERR_COMMENT" 2>/dev/null || true
+    else
+      gh pr comment "$LABEL_NUM" --repo "$REPO" --body "$ERR_COMMENT" 2>/dev/null || true
+    fi
+    tg "*❌ Erreur fix bug*
+\`$TITLE\`
+Exit : \`$FIX_EXIT\` — log : \`$FIX_LOG\`"
+    git checkout "$MAIN_BRANCH" 2>/dev/null || true
+    return 0  # continue avec les autres fixes
+  fi
 
-    local COMMITS_AHEAD
-    COMMITS_AHEAD=$(git rev-list --count "origin/$FIX_BRANCH..HEAD" 2>/dev/null || echo "0")
+  local COMMITS_AHEAD
+  COMMITS_AHEAD=$(git rev-list --count "origin/$FIX_BRANCH..HEAD" 2>/dev/null || echo "0")
 
-    if [ "$COMMITS_AHEAD" != "0" ]; then
-      log "Push $COMMITS_AHEAD commit(s) sur $FIX_BRANCH..."
-      git push origin "$FIX_BRANCH"
-      log "Push OK"
-      gh issue edit "$NUM" --repo "$REPO" --remove-label "agent-fix" 2>/dev/null || true
-      gh issue comment "$NUM" --repo "$REPO" \
-        --body "✅ **Bug corrigé** — $COMMITS_AHEAD commit(s) poussé(s) sur \`$FIX_BRANCH\`. Retester !" 2>/dev/null || true
-      tg "*✅ Bug corrigé*
-\`#$NUM\` — $TITLE
+  if [ "$COMMITS_AHEAD" != "0" ]; then
+    log "Push $COMMITS_AHEAD commit(s) sur $FIX_BRANCH..."
+    git push origin "$FIX_BRANCH"
+    log "Push OK"
+    if [ "$LABEL_TYPE" = "pr" ]; then
+      gh pr edit "$LABEL_NUM" --repo "$REPO" --remove-label "agent-fix" 2>/dev/null || true
+    else
+      gh issue edit "$LABEL_NUM" --repo "$REPO" --remove-label "agent-fix" 2>/dev/null || true
+    fi
+    local OK_COMMENT="✅ **Bug corrigé** — $COMMITS_AHEAD commit(s) poussé(s) sur \`$FIX_BRANCH\`. Retester !"
+    if [ -n "$ISSUE_NUM_CTX" ]; then
+      gh issue comment "$ISSUE_NUM_CTX" --repo "$REPO" --body "$OK_COMMENT" 2>/dev/null || true
+    else
+      gh pr comment "$LABEL_NUM" --repo "$REPO" --body "$OK_COMMENT" 2>/dev/null || true
+    fi
+    tg "*✅ Bug corrigé*
+\`$TITLE\`
 $COMMITS_AHEAD commit(s) → \`$FIX_BRANCH\`
 Retester !"
+  else
+    log "Aucun commit après fix"
+    local WARN_COMMENT="⚠️ L'agent n'a rien commité pour ce correctif. Vérification manuelle nécessaire."
+    if [ -n "$ISSUE_NUM_CTX" ]; then
+      gh issue comment "$ISSUE_NUM_CTX" --repo "$REPO" --body "$WARN_COMMENT" 2>/dev/null || true
     else
-      log "Aucun commit après fix #$NUM"
-      gh issue comment "$NUM" --repo "$REPO" \
-        --body "⚠️ L'agent n'a rien commité pour ce correctif. Vérification manuelle nécessaire." 2>/dev/null || true
-      gh issue edit "$NUM" --repo "$REPO" --remove-label "agent-fix" 2>/dev/null || true
+      gh pr comment "$LABEL_NUM" --repo "$REPO" --body "$WARN_COMMENT" 2>/dev/null || true
     fi
+    if [ "$LABEL_TYPE" = "pr" ]; then
+      gh pr edit "$LABEL_NUM" --repo "$REPO" --remove-label "agent-fix" 2>/dev/null || true
+    else
+      gh issue edit "$LABEL_NUM" --repo "$REPO" --remove-label "agent-fix" 2>/dev/null || true
+    fi
+  fi
 
-    git checkout "$MAIN_BRANCH" 2>/dev/null || true
+  git checkout "$MAIN_BRANCH" 2>/dev/null || true
+}
+
+# ── Fix : corrige les bugs signalés sur PRs et issues (label agent-fix) ──
+handle_fix_issues() {
+  cd "$REPO_DIR"
+  git fetch origin 2>/dev/null || true
+
+  # ── 1. PRs avec agent-fix (branche connue directement) ────────
+  local PR_FIX_LIST PR_COUNT
+  PR_FIX_LIST=$(gh pr list \
+    --repo "$REPO" \
+    --state open \
+    --label "agent-fix" \
+    --json number,title,headRefName,body \
+    --limit 5 2>/dev/null || echo "[]")
+  PR_COUNT=$(echo "$PR_FIX_LIST" | python3 -c "import sys,json; print(len(json.load(sys.stdin)))")
+
+  if [ "$PR_COUNT" -gt "0" ]; then
+    log "[$PR_COUNT PR(s) marquées agent-fix]"
+    for i in $(seq 0 $((PR_COUNT - 1))); do
+      local PR_NUM PR_TITLE FIX_BRANCH LINKED_ISSUE
+
+      PR_NUM=$(echo "$PR_FIX_LIST"   | python3 -c "import sys,json; d=json.load(sys.stdin); print(d[$i]['number'])")
+      PR_TITLE=$(echo "$PR_FIX_LIST" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d[$i]['title'])")
+      FIX_BRANCH=$(echo "$PR_FIX_LIST" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d[$i]['headRefName'])")
+
+      # Extraire le numéro d'issue depuis "Closes #NNN" dans le body
+      LINKED_ISSUE=$(echo "$PR_FIX_LIST" | python3 -c "
+import sys,json,re
+d=json.load(sys.stdin)[$i]
+body=d.get('body','') or ''
+m=re.search(r'[Cc]loses\s+#(\d+)', body)
+print(m.group(1) if m else '')
+")
+      log "PR #$PR_NUM → branche $FIX_BRANCH (issue liée: ${LINKED_ISSUE:-aucune})"
+      _execute_fix "$FIX_BRANCH" "$LINKED_ISSUE" "$PR_TITLE" "pr" "$PR_NUM"
+      local FIX_RC=$?
+      [ "$FIX_RC" -eq 2 ] && return 2
+    done
+  fi
+
+  # ── 2. Issues avec agent-fix (branche calculée depuis le slug) ─
+  local ISSUE_FIX_LIST ISSUE_COUNT
+  ISSUE_FIX_LIST=$(gh issue list \
+    --repo "$REPO" \
+    --state open \
+    --label "agent-fix" \
+    --json number,title \
+    --limit 5 2>/dev/null || echo "[]")
+  ISSUE_COUNT=$(echo "$ISSUE_FIX_LIST" | python3 -c "import sys,json; print(len(json.load(sys.stdin)))")
+
+  [ "$ISSUE_COUNT" -eq "0" ] && return 0
+  log "[$ISSUE_COUNT issue(s) marquées agent-fix]"
+
+  for i in $(seq 0 $((ISSUE_COUNT - 1))); do
+    local NUM TITLE SLUG FIX_BRANCH
+
+    NUM=$(echo "$ISSUE_FIX_LIST"   | python3 -c "import sys,json; d=json.load(sys.stdin); print(d[$i]['number'])")
+    TITLE=$(echo "$ISSUE_FIX_LIST" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d[$i]['title'])")
+
+    SLUG=$(echo "$TITLE" \
+      | tr '[:upper:]' '[:lower:]' \
+      | sed 's/\[f\]//gi' \
+      | sed 's/[^a-z0-9]/-/g' \
+      | sed 's/--*/-/g' \
+      | sed 's/^-\|-$//g' \
+      | cut -c1-40)
+    FIX_BRANCH="feature/${NUM}-${SLUG}"
+
+    log "Issue #$NUM → branche $FIX_BRANCH"
+    _execute_fix "$FIX_BRANCH" "$NUM" "$TITLE" "issue" "$NUM"
+    local FIX_RC=$?
+    [ "$FIX_RC" -eq 2 ] && return 2
   done
 }
 
