@@ -45,7 +45,8 @@ game-the-door-beneath/
 │       ├── test_obstacle_data.gd     ← factory make_wall, obstacles destructibles, blocage
 │       ├── test_monster_stats.gd     ← constantes GameData, conversion ticks, scaling boss
 │       ├── test_spawn_fallback.gd    ← _resolve_spawn_ctx, find_spawn_lane, retry/fallback
-│       └── test_monster_behaviors.gd ← ObstacleBehavior.resolve(), wait/sidestep, priorité, déterminisme
+│       ├── test_monster_behaviors.gd ← ObstacleBehavior.resolve(), wait/sidestep, priorité, déterminisme
+│       └── test_escape_behavior.gd   ← EscapeBehavior.calc_return_hp, get_spawn_type_at, MONSTER_DEFS
 ├── scenes/
 │   ├── title_screen.tscn       ← scène principale au démarrage (menu + meilleurs scores)
 │   ├── main.tscn               ← scène de jeu (lancée depuis title_screen)
@@ -58,6 +59,7 @@ game-the-door-beneath/
 └── scripts/
     ├── obstacle_data.gd        ← class_name ObstacleData (structure de données obstacles)
     ├── obstacle_behavior.gd    ← class_name ObstacleBehavior (résolveur pur de comportements d'obstacle)
+    ├── escape_behavior.gd      ← class_name EscapeBehavior (résolveur pur de comportements de fin de file)
     ├── title_screen.gd         ← menu principal + affichage meilleurs scores (design dark fantasy)
     ├── door_drawing.gd         ← Control custom : porte gothique SVG dessinée via _draw()
     ├── game.gd                 ← coordinateur principal (état, tick, room)
@@ -457,6 +459,92 @@ Quand un monstre quitte la grille par le bas, `game.gd._on_monster_escaped()` te
 **`spawns_in_flight`** reste incrémenté pendant toute la durée d'un respawn en attente, empêchant un room-clear prématuré.
 
 Tests : `test/unit/test_spawn_fallback.gd` — sections `get_respawn_lane` et `tick_pending_respawns`.
+
+### Comportement de fin de file data-driven (issue #109)
+
+Quand un monstre atteint le bout de sa file (`new_row >= GRID_ROWS`), `game.gd._on_monster_escaped()` consulte le champ `escape_behavior` de sa définition dans `MONSTER_DEFS`. Ce champ remplace toute logique implicite de duplication.
+
+**Structure `escape_behavior` dans MONSTER_DEFS :**
+
+```gdscript
+"escape_behavior": {
+    "return_self": {
+        "enabled":        bool,    # le monstre revient-il dans la grille ?
+        "preserve_state": bool,    # true = conserve ses PV courants ; false = repart plein
+        "heal_mode":      String,  # "none" | "flat" | "percent_max" | "full"
+        "heal_value":     variant, # int (flat) ou float (percent_max)
+    },
+    "spawn_on_escape": {
+        "enabled":     bool,
+        "count":       int,            # nombre de spawns additionnels
+        "spawn_types": Array[String],  # types des spawns (ex: ["b"])
+        "mode":        "ordered",      # réutilise la dernière entrée si count > size
+    }
+}
+```
+
+**Modes de heal supportés :**
+
+| `heal_mode` | Comportement |
+|---|---|
+| `"none"` | Aucun soin — conserve exactement ses PV courants (si `preserve_state=true`) |
+| `"flat"` | Soin fixe de `heal_value` PV (borné à `hp_max`) |
+| `"percent_max"` | Soin de `heal_value * hp_max` PV (borné à `hp_max`) |
+| `"full"` | Restaure à `hp_max` quel que soit `preserve_state` |
+
+> `preserve_state=false` + n'importe quel `heal_mode` → base de calcul = `hp_max` (déjà plein).
+
+**Règle spawn_types :** si `spawn_types` contient moins d'entrées que `count`, **la dernière entrée est réutilisée**. Si `spawn_types` est vide, le type du monstre sortant est utilisé comme fallback.
+
+**Séparation retour / spawns additionnels :**
+- `return_self` = le monstre sortant lui-même, qui revient avec ses blessures
+- `spawn_on_escape` = nouveaux monstres indépendants déclenchés par la sortie
+- Les deux sont indépendants et peuvent être combinés (ex: rouge revient + génère un bleu)
+
+**Comportement en l'absence de `escape_behavior` :** aucun spawn implicite — le monstre sort définitivement et `monsters_remaining -= 1`. La room-clear peut se déclencher normalement.
+
+**Profils par monstre :**
+
+| Monstre | `return_self.enabled` | `preserve_state` | `heal_mode` | `spawn_on_escape` |
+|---|---|---|---|---|
+| Gobelin vert (`"g"`) | false | — | — | disabled |
+| Gobelin bleu (`"b"`) | false | — | — | disabled |
+| Gobelin rouge (`"r"`) | true | true | `"none"` | 1 × `"b"` |
+| Boss (`"boss_*"`) | true | true | `"percent_max"` val=0.3 | disabled |
+
+**Helper statique pur :**
+
+`EscapeBehavior` (classe dans `scripts/escape_behavior.gd`) — aucune dépendance scène :
+
+```gdscript
+EscapeBehavior.calc_return_hp(current_hp, hp_max, return_cfg) -> int
+# Calcule le HP de retour selon preserve_state + heal_mode
+
+EscapeBehavior.get_spawn_type_at(spawn_types, index, fallback) -> String
+# Retourne le type à l'index i ; réutilise la dernière entrée si débordement
+```
+
+**Compteurs (invariants garantis) :**
+- `monsters_remaining -= 1` avant tout traitement (monstre sorti)
+- `return_self` activé → `+1 monsters_remaining + 1 spawns_in_flight` avant tentative de spawn
+- `spawn_on_escape` activé → `+count` des deux compteurs
+- `spawns_in_flight` reste incrémenté pendant retry/fallback → room-clear impossible prématurément
+- Si spawn échoue définitivement (abandon) → `monsters_remaining -= 1` via `_execute_respawn_results`
+
+**Unification boss :** les boss suivent désormais le même flux data-driven que les monstres standards. L'ancienne fonction `boss_retreat()` a été supprimée. Le `_def_snapshot` stocké dans `Monster` permet de conserver la def scalée (boss de salles > 15) au moment du respawn.
+
+**Nouveaux champs Monster :**
+- `monster_id: String` — id de la def (ex: `"boss_g"`) ; distinct de `monster_type` (ex: `"g"`)
+- `_def_snapshot: Dictionary` — référence à la def utilisée à l'instantiation
+- `apply_initial_hp(hp_val: int)` — fixe le HP après spawn, appelle `_on_damage_taken()` pour les visuels
+
+**Fichiers concernés :**
+- `scripts/escape_behavior.gd` — helper statique pur (nouveau)
+- `scripts/game_constants.gd` — champ `escape_behavior` dans `MONSTER_DEFS`
+- `scripts/monster.gd` — `monster_id`, `_def_snapshot`, `apply_initial_hp()`
+- `scripts/game_enemies.gd` — `spawn_at_from_def()`, `try_spawn_preferred_from_def()`, `queue_respawn()` étendu
+- `scripts/game.gd` — `_on_monster_escaped()` réécrit, flux boss unifié, `_execute_respawn_results()` mis à jour
+- `test/unit/test_escape_behavior.gd` — tests unitaires GUT
 
 ### Système d'or (issue #29)
 
