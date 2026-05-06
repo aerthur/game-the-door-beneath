@@ -31,7 +31,7 @@ MAIN_BRANCH="main"
 STATE_FILE="$REPO_DIR/.agent_state.json"
 PENDING_RESTART_FILE="$REPO_DIR/.agent_restart_pending"
 MAX_ISSUES=10   # sécurité : max d'issues par exécution
-LOG_PREFIX="[$(date '+%Y-%m-%d %H:%M:%S')] [agent]"
+LOG_PREFIX="[agent]"
 
 # ── Telegram ──────────────────────────────────────────────────────
 # Les variables GAME_TELEGRAM_TOKEN et GAME_TELEGRAM_CHAT_ID
@@ -54,7 +54,7 @@ tg() {
 }
 
 # ── Helpers ───────────────────────────────────────────────────────
-log() { echo "$LOG_PREFIX $*"; }
+log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $LOG_PREFIX $*"; }
 
 state_write() {
   python3 -c "
@@ -90,6 +90,8 @@ gh label create "agent-restart" --repo "$REPO" --color "e99695" \
   --description "Refaire depuis main (codebase changé)" 2>/dev/null || true
 gh label create "agent-retry" --repo "$REPO" --color "f9d0c4" \
   --description "Aucun commit à la 1ère tentative — 2ème essai au prochain cycle" 2>/dev/null || true
+gh label create "agent-fix" --repo "$REPO" --color "d93f0b" \
+  --description "Bug trouvé en test — à corriger par l'agent sur la branche" 2>/dev/null || true
 
 # ── Restart : réinitialise une issue pour la refaire depuis zéro ──
 handle_restart_issues() {
@@ -188,6 +190,154 @@ Branche \`$OLD_BRANCH\` supprimée. Réimplémentation au prochain cycle."
   done
 }
 
+# ── Fix : corrige un bug signalé sur une branche feature existante ──
+handle_fix_issues() {
+  local FIX_LIST COUNT
+
+  FIX_LIST=$(gh issue list \
+    --repo "$REPO" \
+    --state open \
+    --label "agent-fix" \
+    --json number,title \
+    --limit 5 2>/dev/null || echo "[]")
+
+  [ "$FIX_LIST" = "[]" ] || [ -z "$FIX_LIST" ] && return 0
+
+  COUNT=$(echo "$FIX_LIST" | python3 -c "import sys,json; print(len(json.load(sys.stdin)))")
+  log "[$COUNT issue(s) marquées agent-fix]"
+
+  for i in $(seq 0 $((COUNT - 1))); do
+    local NUM TITLE SLUG FIX_BRANCH
+
+    NUM=$(echo "$FIX_LIST"   | python3 -c "import sys,json; d=json.load(sys.stdin); print(d[$i]['number'])")
+    TITLE=$(echo "$FIX_LIST" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d[$i]['title'])")
+
+    SLUG=$(echo "$TITLE" \
+      | tr '[:upper:]' '[:lower:]' \
+      | sed 's/\[f\]//gi' \
+      | sed 's/[^a-z0-9]/-/g' \
+      | sed 's/--*/-/g' \
+      | sed 's/^-\|-$//g' \
+      | cut -c1-40)
+    FIX_BRANCH="feature/${NUM}-${SLUG}"
+
+    cd "$REPO_DIR"
+    git fetch origin 2>/dev/null || true
+
+    if ! git ls-remote --exit-code --heads origin "$FIX_BRANCH" > /dev/null 2>&1; then
+      log "Branche $FIX_BRANCH introuvable pour #$NUM — agent-fix ignoré"
+      gh issue comment "$NUM" --repo "$REPO" \
+        --body "⚠️ Branche \`$FIX_BRANCH\` introuvable — impossible de corriger automatiquement. Vérification manuelle nécessaire." 2>/dev/null || true
+      gh issue edit "$NUM" --repo "$REPO" --remove-label "agent-fix" 2>/dev/null || true
+      continue
+    fi
+
+    # Récupérer les derniers commentaires pour contexte du bug
+    local BUG_CONTEXT
+    BUG_CONTEXT=$(gh issue view "$NUM" --repo "$REPO" --json comments \
+      -q '.comments[-5:] | map("**" + .author.login + "** :\n" + .body) | join("\n\n---\n\n")' \
+      2>/dev/null || echo "")
+    if [ -z "$BUG_CONTEXT" ]; then
+      log "⚠️ Aucun commentaire récupéré pour #$NUM — Claude travaillera sans contexte de bug"
+      BUG_CONTEXT="Pas de commentaires disponibles. Analyse le code de la branche pour détecter le problème."
+    else
+      log "Contexte bug récupéré (${#BUG_CONTEXT} caractères)"
+    fi
+
+    log "════════════════════════════════════════"
+    log "Fix bug #$NUM — $TITLE (branche: $FIX_BRANCH)"
+    log "Checkout + pull $FIX_BRANCH..."
+    git checkout "$FIX_BRANCH"
+    git pull origin "$FIX_BRANCH" 2>/dev/null || true
+    log "Branche prête — $(git log --oneline -1)"
+
+    gh issue comment "$NUM" --repo "$REPO" \
+      --body "🔧 **Correction en cours** — Agent Claude Code prend en charge le bug signalé." 2>/dev/null || true
+
+    tg "*🔧 Correction bug*
+\`#$NUM\` — $TITLE
+Branche : \`$FIX_BRANCH\`"
+
+    local FIX_PROMPT="Tu es un développeur de jeux vidéo travaillant sur 'The Door Beneath', roguelite en lanes (Godot 4.6, GDScript 2.0).
+
+Lis d'abord CLAUDE.md pour comprendre l'architecture.
+
+## Issue #${NUM} : ${TITLE}
+
+Un bug a été signalé pendant les tests. Voici le contexte des derniers commentaires de l'issue :
+
+${BUG_CONTEXT}
+
+## Instructions
+1. Lis CLAUDE.md
+2. git status et git log --oneline -5 pour comprendre l'état de la branche
+3. Analyse précisément le bug décrit dans les commentaires ci-dessus
+4. Corrige le bug sans casser les autres fonctionnalités
+5. Lance les tests unitaires : godot --headless --script addons/gut/gut_cmdln.gd -gconfig=.gutconfig.json
+   - Tous les tests doivent passer. Si certains échouent, corrige jusqu'à ce qu'ils passent tous.
+6. git commit : fix(#${NUM}): description courte du correctif
+
+Ne lance pas Godot en mode jeu. Commit à la fin."
+
+    local FIX_LOG="/tmp/claude-fix-${NUM}.log"
+    local FIX_START
+    FIX_START=$(date +%s)
+    log "Lancement Claude Code (log: $FIX_LOG)..."
+
+    set +e
+    claude --dangerously-skip-permissions -p "$FIX_PROMPT" \
+      --allowedTools "Read,Write,Edit,Bash(git *),Bash(ls *),Bash(find *),Bash(godot *),Glob,Grep" \
+      2>&1 | tee "$FIX_LOG"
+    local FIX_EXIT=${PIPESTATUS[0]}
+    set -e
+
+    local FIX_DURATION=$(( $(date +%s) - FIX_START ))
+    log "Fix terminé (exit: $FIX_EXIT, durée: ${FIX_DURATION}s)"
+
+    if [ "$FIX_EXIT" -ne 0 ]; then
+      if is_token_error "$FIX_LOG"; then
+        log "Tokens épuisés pendant fix #$NUM — arrêt"
+        tg "*⏸ Tokens épuisés (fix bug)*
+Issue \`#$NUM\` — $TITLE
+Reprise automatique à la prochaine exécution."
+        git checkout "$MAIN_BRANCH" 2>/dev/null || true
+        return 2
+      fi
+      log "Erreur lors du fix #$NUM (exit $FIX_EXIT)"
+      gh issue comment "$NUM" --repo "$REPO" \
+        --body "❌ L'agent a rencontré une erreur lors de la correction (exit $FIX_EXIT). Vérification manuelle nécessaire." 2>/dev/null || true
+      tg "*❌ Erreur fix bug*
+\`#$NUM\` — $TITLE
+Exit code : \`$FIX_EXIT\`"
+      git checkout "$MAIN_BRANCH" 2>/dev/null || true
+      continue
+    fi
+
+    local COMMITS_AHEAD
+    COMMITS_AHEAD=$(git rev-list --count "origin/$FIX_BRANCH..HEAD" 2>/dev/null || echo "0")
+
+    if [ "$COMMITS_AHEAD" != "0" ]; then
+      log "Push $COMMITS_AHEAD commit(s) sur $FIX_BRANCH..."
+      git push origin "$FIX_BRANCH"
+      log "Push OK"
+      gh issue edit "$NUM" --repo "$REPO" --remove-label "agent-fix" 2>/dev/null || true
+      gh issue comment "$NUM" --repo "$REPO" \
+        --body "✅ **Bug corrigé** — $COMMITS_AHEAD commit(s) poussé(s) sur \`$FIX_BRANCH\`. Retester !" 2>/dev/null || true
+      tg "*✅ Bug corrigé*
+\`#$NUM\` — $TITLE
+$COMMITS_AHEAD commit(s) → \`$FIX_BRANCH\`
+Retester !"
+    else
+      log "Aucun commit après fix #$NUM"
+      gh issue comment "$NUM" --repo "$REPO" \
+        --body "⚠️ L'agent n'a rien commité pour ce correctif. Vérification manuelle nécessaire." 2>/dev/null || true
+      gh issue edit "$NUM" --repo "$REPO" --remove-label "agent-fix" 2>/dev/null || true
+    fi
+
+    git checkout "$MAIN_BRANCH" 2>/dev/null || true
+  done
+}
+
 # ══════════════════════════════════════════════════════════════════
 # FONCTION : traiter une issue complète (étape par étape)
 # Retourne :
@@ -199,6 +349,10 @@ Branche \`$OLD_BRANCH\` supprimée. Réimplémentation au prochain cycle."
 process_issue() {
   local RESUMING=false
   local LAST_STEP="none"
+  ISSUE_CLAIMED=false  # reset global pour éviter le carry-over entre issues
+  ISSUE_NUM=""
+  ISSUE_TITLE=""
+  BRANCH=""
 
   # ── Reprise ou nouvelle issue ? ──────────────────────────────
   if [ -f "$STATE_FILE" ]; then
@@ -305,6 +459,11 @@ Branche : \`$BRANCH\`"
       done
 
       if [ "$DEPS_OK" = true ]; then
+        # Ignorer si déjà traitée dans cette session (évite re-pick dû au lag GitHub Search)
+        if echo " $ISSUES_PROCESSED_THIS_SESSION " | grep -q " $CANDIDATE_NUM "; then
+          log "Issue #$CANDIDATE_NUM déjà traitée cette session — ignorée"
+          continue
+        fi
         SELECTED="$i"
         ISSUE_NUM="$CANDIDATE_NUM"
         ISSUE_TITLE="$CANDIDATE_TITLE"
@@ -314,7 +473,11 @@ Branche : \`$BRANCH\`"
     done
 
     if [ -z "$SELECTED" ]; then
-      log "Toutes les issues disponibles sont bloquées par des dépendances non mergées."
+      if [ -n "$ISSUES_PROCESSED_THIS_SESSION" ]; then
+        log "Aucune issue restante (bloquées par dépendances ou déjà traitées cette session)."
+      else
+        log "Toutes les issues disponibles sont bloquées par des dépendances non mergées."
+      fi
       return 3
     fi
     fi  # fin du if [ -z "${ISSUE_NUM:-}" ]
@@ -329,6 +492,7 @@ Branche : \`$BRANCH\`"
     BRANCH="feature/${ISSUE_NUM}-${SLUG}"
 
     if [ "${ISSUE_CLAIMED:-false}" != "true" ]; then
+      log "════════════════════════════════════════"
       log "Issue sélectionnée : #$ISSUE_NUM — $ISSUE_TITLE"
       gh issue edit "$ISSUE_NUM" --repo "$REPO" --add-assignee "@me"
       gh issue comment "$ISSUE_NUM" --repo "$REPO" \
@@ -363,7 +527,7 @@ Branche : \`$BRANCH\`"
   [ "$(git rev-parse --abbrev-ref HEAD)" != "$BRANCH" ] && git checkout "$BRANCH"
 
   # ── Étape 2 : Claude Code ────────────────────────────────────
-  if [ "$LAST_STEP" = "branch_created" ] || [ "$LAST_STEP" = "claude_interrupted" ]; then
+  if [ "$LAST_STEP" = "branch_created" ] || [ "$LAST_STEP" = "claude_interrupted" ] || [ "$LAST_STEP" = "claude_running" ]; then
     RESUME_NOTE=""
     [ "$LAST_STEP" = "claude_interrupted" ] && \
       RESUME_NOTE="Note : exécution précédente interrompue. Fais git status pour voir l'état, continue sans écraser ce qui est bien fait."
@@ -383,22 +547,29 @@ ${ISSUE_BODY}
 3. Implémente la feature
 4. Respecte le style GDScript existant
 5. Pas de syntaxe invalide dans les .tscn
-6. git commit : feat(#${ISSUE_NUM}): description courte
+6. Lance les tests unitaires : godot --headless --script addons/gut/gut_cmdln.gd -gconfig=.gutconfig.json
+   - Tous les tests doivent passer. Si certains échouent, corrige le code jusqu'à ce qu'ils passent tous.
+   - Enrichis ou crée les tests unitaires couvrant la logique de la feature implémentée (dans test/unit/).
+7. Mets à jour CLAUDE.md pour refléter les changements apportés (nouvelles fonctions publiques, systèmes, conventions, champs de données).
+8. git commit : feat(#${ISSUE_NUM}): description courte (inclure les tests et la doc dans le même commit ou en commits séparés)
 
-Ne lance pas Godot. Commit à la fin."
+Ne lance pas Godot en mode jeu. Commit à la fin."
 
     local CLAUDE_LOG="/tmp/claude-output-${ISSUE_NUM}.log"
     state_write "claude_running"
+    local CLAUDE_START
+    CLAUDE_START=$(date +%s)
     log "Lancement Claude Code..."
 
     set +e
     claude --dangerously-skip-permissions -p "$PROMPT" \
-      --allowedTools "Read,Write,Edit,Bash(git *),Bash(ls *),Bash(find *),Glob,Grep" \
+      --allowedTools "Read,Write,Edit,Bash(git *),Bash(ls *),Bash(find *),Bash(godot *),Glob,Grep" \
       2>&1 | tee "$CLAUDE_LOG"
     CLAUDE_EXIT=${PIPESTATUS[0]}
     set -e
 
-    log "Claude terminé (exit: $CLAUDE_EXIT)"
+    local CLAUDE_DURATION=$(( $(date +%s) - CLAUDE_START ))
+    log "Claude terminé (exit: $CLAUDE_EXIT, durée: ${CLAUDE_DURATION}s)"
 
     if [ "$CLAUDE_EXIT" -ne 0 ]; then
       if is_token_error "$CLAUDE_LOG"; then
@@ -425,7 +596,27 @@ Log : \`/tmp/claude-output-${ISSUE_NUM}.log\`"
   # ── Étape 3 : push ───────────────────────────────────────────
   if [ "$LAST_STEP" = "claude_done" ] || [ "$LAST_STEP" = "push_failed" ]; then
     COMMITS_AHEAD=$(git rev-list --count "origin/$MAIN_BRANCH..HEAD" 2>/dev/null || echo "0")
+    log "Commits en avance sur $MAIN_BRANCH : $COMMITS_AHEAD"
     if [ "$COMMITS_AHEAD" = "0" ]; then
+      # Si une PR existe déjà, la feature est déjà implémentée → agent-done direct
+      EXISTING_PR_CHECK=$(gh pr list --repo "$REPO" --head "$BRANCH" --json url -q '.[0].url' 2>/dev/null || echo "")
+      if [ -n "$EXISTING_PR_CHECK" ]; then
+        log "Aucun commit mais PR existante ($EXISTING_PR_CHECK) — issue déjà traitée"
+        gh label create "agent-done" --repo "$REPO" --color "0075ca" \
+          --description "Traité par agent Claude Code" 2>/dev/null || true
+        gh issue edit "$ISSUE_NUM" --repo "$REPO" \
+          --add-label "agent-done" \
+          --remove-assignee "@me" 2>/dev/null || true
+        gh issue comment "$ISSUE_NUM" --repo "$REPO" \
+          --body "✅ Feature déjà implémentée — PR existante : $EXISTING_PR_CHECK. Issue marquée \`agent-done\`." 2>/dev/null || true
+        tg "*✅ Issue déjà traitée*
+\`#$ISSUE_NUM\` — $ISSUE_TITLE
+PR : $EXISTING_PR_CHECK
+Marquée \`agent-done\`."
+        state_clear
+        return 0
+      fi
+
       # Vérifier si c'est déjà la 2ème tentative vide (label agent-retry présent)
       HAS_RETRY=$(gh issue view "$ISSUE_NUM" --repo "$REPO" --json labels \
         -q '[.labels[].name] | index("agent-retry") != null' 2>/dev/null || echo "false")
@@ -543,16 +734,23 @@ Recherche d'issues \`[F]\` à traiter..."
 
 ISSUES_DONE=0
 SESSION_START=$(date '+%H:%M')
+ISSUES_PROCESSED_THIS_SESSION=""  # liste séparée par espaces pour éviter le re-pick
 
 while [ "$ISSUES_DONE" -lt "$MAX_ISSUES" ]; do
   handle_restart_issues
+  handle_fix_issues
+  set +e
   process_issue
   EXIT_CODE=$?
+  set -e
 
   case $EXIT_CODE in
     0)  # succès — chercher la suivante
         ISSUES_DONE=$((ISSUES_DONE + 1))
+        # Mémoriser l'issue pour éviter le re-pick dans la même session
+        [ -n "${ISSUE_NUM:-}" ] && ISSUES_PROCESSED_THIS_SESSION="$ISSUES_PROCESSED_THIS_SESSION $ISSUE_NUM"
         log "Issue traitée ($ISSUES_DONE/$MAX_ISSUES) — recherche de la suivante..."
+        log "────────────────────────────────────────"
         sleep 2
         ;;
     2)  # token épuisé
