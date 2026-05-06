@@ -281,11 +281,13 @@ Ne lance pas Godot en mode jeu. Commit à la fin."
   FIX_START=$(date +%s)
   log "Lancement Claude Code (log: $FIX_LOG)..."
 
+  local PROMPT_FILE="/tmp/claude-prompt-${LABEL_TYPE}${LABEL_NUM}.txt"
+  printf '%s' "$FIX_PROMPT" > "$PROMPT_FILE"
+
   set +e
-  claude --dangerously-skip-permissions -p "$FIX_PROMPT" \
-    --allowedTools "Read,Write,Edit,Bash(git *),Bash(ls *),Bash(find *),Bash(godot *),Glob,Grep" \
-    2>&1 | tee "$FIX_LOG"
-  local FIX_EXIT=${PIPESTATUS[0]}
+  script -qef "$FIX_LOG" -c "claude --dangerously-skip-permissions -p \"\$(cat \"$PROMPT_FILE\")\" \
+    --allowedTools 'Read,Write,Edit,Bash(git *),Bash(ls *),Bash(find *),Bash(godot *),Glob,Grep'"
+  local FIX_EXIT=$?
   set -e
 
   local FIX_DURATION=$(( $(date +%s) - FIX_START ))
@@ -651,11 +653,13 @@ Ne lance pas Godot en mode jeu. Commit à la fin."
     CLAUDE_START=$(date +%s)
     log "Lancement Claude Code..."
 
+    local PROMPT_FILE_MAIN="/tmp/claude-prompt-issue${ISSUE_NUM}.txt"
+    printf '%s' "$PROMPT" > "$PROMPT_FILE_MAIN"
+
     set +e
-    claude --dangerously-skip-permissions -p "$PROMPT" \
-      --allowedTools "Read,Write,Edit,Bash(git *),Bash(ls *),Bash(find *),Bash(godot *),Glob,Grep" \
-      2>&1 | tee "$CLAUDE_LOG"
-    CLAUDE_EXIT=${PIPESTATUS[0]}
+    script -qef "$CLAUDE_LOG" -c "claude --dangerously-skip-permissions -p \"\$(cat \"$PROMPT_FILE_MAIN\")\" \
+      --allowedTools 'Read,Write,Edit,Bash(git *),Bash(ls *),Bash(find *),Bash(godot *),Glob,Grep'"
+    CLAUDE_EXIT=$?
     set -e
 
     local CLAUDE_DURATION=$(( $(date +%s) - CLAUDE_START ))
