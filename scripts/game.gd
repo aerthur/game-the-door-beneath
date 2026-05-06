@@ -422,8 +422,11 @@ func _grid_empty() -> bool:
 	return board_state.is_grid_empty()
 
 func _room_cleared():
-	await visuals.play_door_animation(room_num, player_ctrl.player_lane, _add_gold)
+	# room_clear = true AVANT l'await : tout kill parasite arrivant pendant l'animation
+	# de porte trouvera room_clear = true dans _check_room_clear() et court-circuitera,
+	# empêchant le double déclenchement (ex: boss skippé à la salle 15).
 	room_clear = true
+	await visuals.play_door_animation(room_num, player_ctrl.player_lane, _add_gold)
 	_start_room(room_num + 1)
 
 # ── Gemmes ───────────────────────────────────────────────────────
