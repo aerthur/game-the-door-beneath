@@ -206,7 +206,7 @@ _execute_fix() {
     if [ "$LABEL_TYPE" = "pr" ]; then
       gh pr comment "$LABEL_NUM" --repo "$REPO" \
         --body "⚠️ Branche \`$FIX_BRANCH\` introuvable — impossible de corriger. Vérification manuelle nécessaire." 2>/dev/null || true
-      gh pr edit "$LABEL_NUM" --repo "$REPO" --remove-label "agent-fix" 2>/dev/null || true
+      gh api --method DELETE "repos/$REPO/issues/$LABEL_NUM/labels/agent-fix" 2>/dev/null || true
     else
       gh issue comment "$LABEL_NUM" --repo "$REPO" \
         --body "⚠️ Branche \`$FIX_BRANCH\` introuvable — impossible de corriger. Vérification manuelle nécessaire." 2>/dev/null || true
@@ -324,7 +324,7 @@ Exit : \`$FIX_EXIT\` — log : \`$FIX_LOG\`"
     git push origin "$FIX_BRANCH"
     log "Push OK"
     if [ "$LABEL_TYPE" = "pr" ]; then
-      gh pr edit "$LABEL_NUM" --repo "$REPO" --remove-label "agent-fix" 2>/dev/null || true
+      gh api --method DELETE "repos/$REPO/issues/$LABEL_NUM/labels/agent-fix" 2>/dev/null || true
     else
       gh issue edit "$LABEL_NUM" --repo "$REPO" --remove-label "agent-fix" 2>/dev/null || true
     fi
@@ -347,7 +347,7 @@ Retester !"
       gh pr comment "$LABEL_NUM" --repo "$REPO" --body "$WARN_COMMENT" 2>/dev/null || true
     fi
     if [ "$LABEL_TYPE" = "pr" ]; then
-      gh pr edit "$LABEL_NUM" --repo "$REPO" --remove-label "agent-fix" 2>/dev/null || true
+      gh api --method DELETE "repos/$REPO/issues/$LABEL_NUM/labels/agent-fix" 2>/dev/null || true
     else
       gh issue edit "$LABEL_NUM" --repo "$REPO" --remove-label "agent-fix" 2>/dev/null || true
     fi
