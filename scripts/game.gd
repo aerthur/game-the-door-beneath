@@ -352,6 +352,11 @@ func _on_monster_escaped(lane: int, monster_id: String, current_hp: int, def_sna
 				enemies.queue_respawn(lane, spawn_type)
 				print("[ESCAPE-SPAWN] File %d type=%s — spawn différé — remaining: %d" % [lane+1, spawn_type, monsters_remaining])
 
+	# Vérifie la fin de salle après avoir potentiellement lancé des spawns.
+	# Si aucun spawn n'a été déclenché (escape_behavior disabled), le room clear
+	# se produit ici ; sinon il se produira via _execute_respawn_results / _on_monster_killed.
+	_check_room_clear()
+
 # Exécute les actions retournées par enemies.tick_pending_respawns().
 func _execute_respawn_results(results: Array) -> void:
 	for r in results:
