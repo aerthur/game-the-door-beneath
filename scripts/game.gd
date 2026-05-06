@@ -268,9 +268,11 @@ func _do_tick():
 				var cur_hp       = m.hp
 				var def_snapshot = m._def_snapshot
 				board_state.clear_cell(r, l)
-				var dmg_cfg     : Dictionary = def_snapshot.get("escape_behavior", {}).get("damage_on_escape", {"lane_offsets": [0]})
-				var hit_lanes   : Array      = EscapeBehavior.get_hit_lanes(dmg_cfg.get("lane_offsets", [0]), l, BoardGeometry.GRID_COLUMNS)
+				var dmg_cfg   : Dictionary = def_snapshot.get("escape_behavior", {}).get("damage_on_escape", {"lane_offsets": [0]})
+				var hit_lanes : Array      = EscapeBehavior.get_hit_lanes(dmg_cfg.get("lane_offsets", [0]), l, BoardGeometry.GRID_COLUMNS)
+				var hit_color : Color      = def_snapshot.get("palette", {}).get("main", Color(0.8, 0.1, 0.1))
 				for tl in hit_lanes:
+					visuals.show_escape_hit(tl, hit_color)
 					if tl == player_ctrl.player_lane:
 						player_ctrl.hit(dmg)
 				m.queue_free()
