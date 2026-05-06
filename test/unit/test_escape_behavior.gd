@@ -159,54 +159,54 @@ func test_setup_from_def_boss_stores_monster_id_as_boss_key() -> void:
 
 func test_all_monster_defs_have_escape_behavior() -> void:
 	for monster_id in GameData.MONSTER_DEFS:
-		var def := GameData.MONSTER_DEFS[monster_id]
+		var def: Dictionary = GameData.MONSTER_DEFS[monster_id]
 		assert_true(def.has("escape_behavior"),
 			"MONSTER_DEFS['%s'] doit avoir le champ escape_behavior" % monster_id)
 
 func test_all_escape_behaviors_have_return_self() -> void:
 	for monster_id in GameData.MONSTER_DEFS:
-		var eb := GameData.MONSTER_DEFS[monster_id]["escape_behavior"]
+		var eb: Dictionary = GameData.MONSTER_DEFS[monster_id]["escape_behavior"]
 		assert_true(eb.has("return_self"),
 			"escape_behavior['%s'] doit avoir return_self" % monster_id)
 
 func test_all_escape_behaviors_have_spawn_on_escape() -> void:
 	for monster_id in GameData.MONSTER_DEFS:
-		var eb := GameData.MONSTER_DEFS[monster_id]["escape_behavior"]
+		var eb: Dictionary = GameData.MONSTER_DEFS[monster_id]["escape_behavior"]
 		assert_true(eb.has("spawn_on_escape"),
 			"escape_behavior['%s'] doit avoir spawn_on_escape" % monster_id)
 
 func test_green_goblin_does_not_return() -> void:
-	var eb := GameData.MONSTER_DEFS["g"]["escape_behavior"]
+	var eb: Dictionary = GameData.MONSTER_DEFS["g"]["escape_behavior"]
 	assert_false(eb["return_self"].get("enabled", true),
 		"gobelin vert : return_self.enabled = false (sort définitivement)")
 
 func test_green_goblin_no_additional_spawns() -> void:
-	var eb := GameData.MONSTER_DEFS["g"]["escape_behavior"]
+	var eb: Dictionary = GameData.MONSTER_DEFS["g"]["escape_behavior"]
 	assert_false(eb["spawn_on_escape"].get("enabled", true),
 		"gobelin vert : spawn_on_escape.enabled = false (aucun spawn additionnel)")
 
 func test_blue_goblin_does_not_return() -> void:
-	var eb := GameData.MONSTER_DEFS["b"]["escape_behavior"]
+	var eb: Dictionary = GameData.MONSTER_DEFS["b"]["escape_behavior"]
 	assert_false(eb["return_self"].get("enabled", true),
 		"gobelin bleu : return_self.enabled = false (sort définitivement)")
 
 func test_red_goblin_returns() -> void:
-	var eb := GameData.MONSTER_DEFS["r"]["escape_behavior"]
+	var eb: Dictionary = GameData.MONSTER_DEFS["r"]["escape_behavior"]
 	assert_true(eb["return_self"].get("enabled", false),
 		"gobelin rouge : return_self.enabled = true (revient)")
 
 func test_red_goblin_preserves_state() -> void:
-	var eb := GameData.MONSTER_DEFS["r"]["escape_behavior"]
+	var eb: Dictionary = GameData.MONSTER_DEFS["r"]["escape_behavior"]
 	assert_true(eb["return_self"].get("preserve_state", false),
 		"gobelin rouge : preserve_state = true (revient blessé)")
 
 func test_red_goblin_no_heal() -> void:
-	var eb := GameData.MONSTER_DEFS["r"]["escape_behavior"]
+	var eb: Dictionary = GameData.MONSTER_DEFS["r"]["escape_behavior"]
 	assert_eq(eb["return_self"].get("heal_mode", ""), "none",
 		"gobelin rouge : heal_mode = none (pas de soin au retour)")
 
 func test_red_goblin_spawns_blue() -> void:
-	var eb := GameData.MONSTER_DEFS["r"]["escape_behavior"]
+	var eb: Dictionary = GameData.MONSTER_DEFS["r"]["escape_behavior"]
 	assert_true(eb["spawn_on_escape"].get("enabled", false),
 		"gobelin rouge : spawn_on_escape.enabled = true")
 	assert_eq(eb["spawn_on_escape"].get("count", 0), 1,
@@ -216,14 +216,14 @@ func test_red_goblin_spawns_blue() -> void:
 
 func test_red_goblin_return_hp_calculation() -> void:
 	# Rouge à 30/90 HP, heal_mode=none, preserve_state=true → retour à 30
-	var eb      := GameData.MONSTER_DEFS["r"]["escape_behavior"]
-	var ret_cfg := eb["return_self"]
+	var eb      : Dictionary = GameData.MONSTER_DEFS["r"]["escape_behavior"]
+	var ret_cfg : Dictionary = eb["return_self"]
 	var hp      := EscapeBehavior.calc_return_hp(30, 90, ret_cfg)
 	assert_eq(hp, 30, "rouge blessé revient avec ses PV courants (30/90)")
 
 func test_boss_returns_with_heal() -> void:
 	for boss_id in ["boss_g", "boss_b", "boss_r"]:
-		var eb := GameData.MONSTER_DEFS[boss_id]["escape_behavior"]
+		var eb: Dictionary = GameData.MONSTER_DEFS[boss_id]["escape_behavior"]
 		assert_true(eb["return_self"].get("enabled", false),
 			"boss '%s' : return_self.enabled = true" % boss_id)
 		assert_eq(eb["return_self"].get("heal_mode", ""), "percent_max",
@@ -233,21 +233,21 @@ func test_boss_returns_with_heal() -> void:
 
 func test_boss_no_additional_spawns() -> void:
 	for boss_id in ["boss_g", "boss_b", "boss_r"]:
-		var eb := GameData.MONSTER_DEFS[boss_id]["escape_behavior"]
+		var eb: Dictionary = GameData.MONSTER_DEFS[boss_id]["escape_behavior"]
 		assert_false(eb["spawn_on_escape"].get("enabled", true),
 			"boss '%s' : spawn_on_escape.enabled = false" % boss_id)
 
 func test_boss_return_hp_calculation() -> void:
 	# Boss vert hp_max=300, en vie à 100, heal 30% → 100 + 90 = 190
-	var eb      := GameData.MONSTER_DEFS["boss_g"]["escape_behavior"]
-	var ret_cfg := eb["return_self"]
+	var eb      : Dictionary = GameData.MONSTER_DEFS["boss_g"]["escape_behavior"]
+	var ret_cfg : Dictionary = eb["return_self"]
 	var hp      := EscapeBehavior.calc_return_hp(100, 300, ret_cfg)
 	assert_eq(hp, 190, "boss à 100/300 PV + 30%% = 190 PV")
 
 func test_boss_return_hp_capped_at_max() -> void:
 	# Boss presque plein (270/300) + 30% = 270 + 90 = 360 → borné à 300
-	var eb      := GameData.MONSTER_DEFS["boss_g"]["escape_behavior"]
-	var ret_cfg := eb["return_self"]
+	var eb      : Dictionary = GameData.MONSTER_DEFS["boss_g"]["escape_behavior"]
+	var ret_cfg : Dictionary = eb["return_self"]
 	var hp      := EscapeBehavior.calc_return_hp(270, 300, ret_cfg)
 	assert_eq(hp, 300, "boss presque plein + heal → borné à hp_max")
 

@@ -220,7 +220,7 @@ func try_spawn_preferred(monster_id: String, lane: int) -> bool:
 # Spawn depuis un def déjà résolu (boss scalé ou monstre avec HP initial précis).
 # initial_hp = -1 → utilise le HP de la def (pleine vie).
 func spawn_at_from_def(monster_id: String, def: Dictionary, row: int, lane: int, initial_hp: int = -1) -> bool:
-	var actual_def := def if not def.is_empty() else GameData.MONSTER_DEFS.get(monster_id, {})
+	var actual_def: Dictionary = def if not def.is_empty() else GameData.MONSTER_DEFS.get(monster_id, {})
 	if actual_def.is_empty():
 		return false
 	if not board_state.is_cell_free(row, lane) or board_state.is_cell_blocked(row, lane):
