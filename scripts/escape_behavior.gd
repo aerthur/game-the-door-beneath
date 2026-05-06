@@ -6,6 +6,10 @@ class_name EscapeBehavior
 #
 # Structure escape_behavior attendue dans MONSTER_DEFS :
 #   {
+#     "damage_on_escape": {
+#       "lane_offsets": Array[int],  # offsets de lanes touchées (ex: [0] ou [-1,0,1])
+#                                    # vide = pas de dégâts au joueur
+#     },
 #     "return_self": {
 #       "enabled":        bool,
 #       "preserve_state": bool,   # true = conserve HP courant, false = repart pleine vie
@@ -42,3 +46,19 @@ static func get_spawn_type_at(spawn_types: Array, index: int, fallback: String) 
 	if spawn_types.is_empty():
 		return fallback
 	return spawn_types[min(index, spawn_types.size() - 1)]
+
+# Calcule la liste des lanes effectivement touchées par les dégâts d'évasion.
+# lane_offsets : offsets relatifs à escape_lane (ex: [0] ou [-1,0,1])
+# escape_lane  : index de la lane où le monstre a atteint le bas
+# max_cols     : nombre total de lanes (BoardGeometry.GRID_COLUMNS)
+# Retourne un Array[int] de lanes uniques valides, clampées dans [0, max_cols-1].
+# Tableau vide = pas de dégâts.
+static func get_hit_lanes(lane_offsets: Array, escape_lane: int, max_cols: int) -> Array:
+	var seen  : Dictionary = {}
+	var lanes : Array      = []
+	for offset in lane_offsets:
+		var lane : int = clamp(escape_lane + offset, 0, max_cols - 1)
+		if not seen.has(lane):
+			seen[lane] = true
+			lanes.append(lane)
+	return lanes

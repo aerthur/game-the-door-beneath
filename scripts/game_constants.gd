@@ -63,6 +63,7 @@ const MONSTER_DEFS = {
 		},
 		# Comportement de fin de file : sort définitivement, pas de remplacement
 		"escape_behavior": {
+			"damage_on_escape": {"lane_offsets": [0]},   # frappe uniquement la lane d'évasion
 			"return_self":     {"enabled": false},
 			"spawn_on_escape": {"enabled": false, "count": 0, "spawn_types": [], "mode": "ordered"},
 		},
@@ -95,6 +96,7 @@ const MONSTER_DEFS = {
 		},
 		# Comportement de fin de file : sort définitivement, pas de remplacement
 		"escape_behavior": {
+			"damage_on_escape": {"lane_offsets": [0]},   # frappe uniquement la lane d'évasion
 			"return_self":     {"enabled": false},
 			"spawn_on_escape": {"enabled": false, "count": 0, "spawn_types": [], "mode": "ordered"},
 		},
@@ -129,6 +131,7 @@ const MONSTER_DEFS = {
 		},
 		# Comportement de fin de file : revient blessé (sans heal) et génère un bleu supplémentaire
 		"escape_behavior": {
+			"damage_on_escape": {"lane_offsets": [0]},   # frappe uniquement la lane d'évasion
 			"return_self": {
 				"enabled":        true,
 				"preserve_state": true,   # conserve ses PV courants
@@ -167,8 +170,9 @@ const MONSTER_DEFS = {
 			"nose": Color(0.18, 0.40, 0.10),
 			"eye":  Color(0.85, 0.70, 0.05),
 		},
-		# Comportement de fin de file : revient soigné de 30% des PV max, sans spawn additionnel
+		# Comportement de fin de file : revient soigné de 30% des PV max, frappe 3 lanes
 		"escape_behavior": {
+			"damage_on_escape": {"lane_offsets": [-1, 0, 1]},  # frappe lane-1, lane, lane+1
 			"return_self": {
 				"enabled":        true,
 				"preserve_state": true,
@@ -200,6 +204,7 @@ const MONSTER_DEFS = {
 			"eye":  Color(0.90, 0.90, 0.10),
 		},
 		"escape_behavior": {
+			"damage_on_escape": {"lane_offsets": [-1, 0, 1]},  # frappe lane-1, lane, lane+1
 			"return_self": {
 				"enabled":        true,
 				"preserve_state": true,
@@ -231,6 +236,7 @@ const MONSTER_DEFS = {
 			"eye":  Color(1.00, 0.55, 0.05),
 		},
 		"escape_behavior": {
+			"damage_on_escape": {"lane_offsets": [-1, 0, 1]},  # frappe lane-1, lane, lane+1
 			"return_self": {
 				"enabled":        true,
 				"preserve_state": true,

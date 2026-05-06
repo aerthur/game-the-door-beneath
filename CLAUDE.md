@@ -46,7 +46,7 @@ game-the-door-beneath/
 │       ├── test_monster_stats.gd     ← constantes GameData, conversion ticks, scaling boss
 │       ├── test_spawn_fallback.gd    ← _resolve_spawn_ctx, find_spawn_lane, retry/fallback
 │       ├── test_monster_behaviors.gd ← ObstacleBehavior.resolve(), wait/sidestep, priorité, déterminisme
-│       └── test_escape_behavior.gd   ← EscapeBehavior.calc_return_hp, get_spawn_type_at, MONSTER_DEFS
+│       └── test_escape_behavior.gd   ← EscapeBehavior.calc_return_hp, get_spawn_type_at, get_hit_lanes, MONSTER_DEFS
 ├── scenes/
 │   ├── title_screen.tscn       ← scène principale au démarrage (menu + meilleurs scores)
 │   ├── main.tscn               ← scène de jeu (lancée depuis title_screen)
@@ -468,6 +468,12 @@ Quand un monstre atteint le bout de sa file (`new_row >= GRID_ROWS`), `game.gd._
 
 ```gdscript
 "escape_behavior": {
+    "damage_on_escape": {
+        "lane_offsets": Array[int],  # offsets relatifs à la lane d'évasion → lanes touchées
+                                     # [0] = file d'évasion seulement
+                                     # [-1, 0, 1] = file + deux adjacentes (boss)
+                                     # [] = aucun dégât au joueur
+    },
     "return_self": {
         "enabled":        bool,    # le monstre revient-il dans la grille ?
         "preserve_state": bool,    # true = conserve ses PV courants ; false = repart plein
@@ -503,14 +509,23 @@ Quand un monstre atteint le bout de sa file (`new_row >= GRID_ROWS`), `game.gd._
 
 **Comportement en l'absence de `escape_behavior` :** aucun spawn implicite — le monstre sort définitivement et `monsters_remaining -= 1`. La room-clear peut se déclencher normalement.
 
+**Dégâts d'évasion (`damage_on_escape`) :**
+
+`game.gd._do_tick()` appelle `EscapeBehavior.get_hit_lanes(lane_offsets, escape_lane, max_cols)` pour calculer les lanes effectivement touchées (clampage aux bords, déduplication). Si le joueur est sur l'une de ces lanes, il subit `m.damage`.
+
+- Monstre standard (`lane_offsets: [0]`) → 1 lane
+- Boss (`lane_offsets: [-1, 0, 1]`) → 3 lanes (réduit à 2 aux bords)
+- Futur monstre sans dégâts (`lane_offsets: []`) → aucun dégât
+- Futur boss ou monstre élargi : tout tableau d'offsets fonctionne
+
 **Profils par monstre :**
 
-| Monstre | `return_self.enabled` | `preserve_state` | `heal_mode` | `spawn_on_escape` |
-|---|---|---|---|---|
-| Gobelin vert (`"g"`) | false | — | — | disabled |
-| Gobelin bleu (`"b"`) | false | — | — | disabled |
-| Gobelin rouge (`"r"`) | true | true | `"none"` | 1 × `"b"` |
-| Boss (`"boss_*"`) | true | true | `"percent_max"` val=0.3 | disabled |
+| Monstre | `lane_offsets` | `return_self.enabled` | `preserve_state` | `heal_mode` | `spawn_on_escape` |
+|---|---|---|---|---|---|
+| Gobelin vert (`"g"`) | `[0]` | false | — | — | disabled |
+| Gobelin bleu (`"b"`) | `[0]` | false | — | — | disabled |
+| Gobelin rouge (`"r"`) | `[0]` | true | true | `"none"` | 1 × `"b"` |
+| Boss (`"boss_*"`) | `[-1, 0, 1]` | true | true | `"percent_max"` val=0.3 | disabled |
 
 **Helper statique pur :**
 
@@ -522,6 +537,10 @@ EscapeBehavior.calc_return_hp(current_hp, hp_max, return_cfg) -> int
 
 EscapeBehavior.get_spawn_type_at(spawn_types, index, fallback) -> String
 # Retourne le type à l'index i ; réutilise la dernière entrée si débordement
+
+EscapeBehavior.get_hit_lanes(lane_offsets, escape_lane, max_cols) -> Array[int]
+# Calcule les lanes touchées : clamp dans [0, max_cols-1], déduplication
+# [] en entrée → [] en sortie (aucun dégât)
 ```
 
 **Compteurs (invariants garantis) :**

@@ -287,3 +287,68 @@ func test_tick_pending_respawns_passes_initial_hp_in_result() -> void:
 	assert_eq(results[0]["initial_hp"], 42, "initial_hp propagé dans le résultat")
 	assert_false(results[0]["def_snapshot"].is_empty(),
 		"def_snapshot propagé dans le résultat")
+
+# ── get_hit_lanes : calcul des lanes touchées au moment de l'évasion ─
+
+func test_hit_lanes_single_offset_center_lane() -> void:
+	# Un monstre standard en lane 2 (centre) avec offset [0] → touche uniquement lane 2
+	var lanes := EscapeBehavior.get_hit_lanes([0], 2, 5)
+	assert_eq(lanes, [2], "offset [0] en lane 2 → lane 2 uniquement")
+
+func test_hit_lanes_three_offsets_boss_center() -> void:
+	# Boss en lane 2, offsets [-1, 0, 1] → lanes [1, 2, 3]
+	var lanes := EscapeBehavior.get_hit_lanes([-1, 0, 1], 2, 5)
+	assert_eq(lanes.size(), 3, "boss centre → 3 lanes touchées")
+	assert_true(lanes.has(1) and lanes.has(2) and lanes.has(3),
+		"boss centre → lanes 1, 2, 3")
+
+func test_hit_lanes_boss_leftmost_lane_clamp() -> void:
+	# Boss en lane 0 (bord gauche), offsets [-1, 0, 1] → clamp : lanes [0, 1] (pas -1)
+	var lanes := EscapeBehavior.get_hit_lanes([-1, 0, 1], 0, 5)
+	assert_false(lanes.has(-1), "lane -1 n'existe pas")
+	assert_true(lanes.has(0) and lanes.has(1), "lanes 0 et 1 présentes")
+
+func test_hit_lanes_boss_rightmost_lane_clamp() -> void:
+	# Boss en lane 4 (bord droit), offsets [-1, 0, 1] → clamp : lanes [3, 4] (pas 5)
+	var lanes := EscapeBehavior.get_hit_lanes([-1, 0, 1], 4, 5)
+	assert_false(lanes.has(5), "lane 5 n'existe pas (max_cols=5)")
+	assert_true(lanes.has(3) and lanes.has(4), "lanes 3 et 4 présentes")
+
+func test_hit_lanes_deduplication_on_corner() -> void:
+	# Boss en lane 0 avec [-1, 0, 1] : offset -1 clampé à 0, même que offset 0 → pas de doublon
+	var lanes := EscapeBehavior.get_hit_lanes([-1, 0, 1], 0, 5)
+	var seen  : Dictionary = {}
+	for ln in lanes:
+		assert_false(seen.has(ln), "lane %d apparaît en doublon" % ln)
+		seen[ln] = true
+
+func test_hit_lanes_empty_offsets_no_damage() -> void:
+	# [] → aucune lane touchée (comportement "no damage")
+	var lanes := EscapeBehavior.get_hit_lanes([], 2, 5)
+	assert_eq(lanes.size(), 0, "offsets vides → aucune lane touchée")
+
+func test_hit_lanes_default_fallback_on_missing_key() -> void:
+	# Si escape_behavior n'a pas de damage_on_escape, game.gd utilise [0] comme fallback
+	var dmg_cfg : Dictionary = {}   # escape_behavior vide → pas de "damage_on_escape"
+	var offsets : Array = dmg_cfg.get("lane_offsets", [0])
+	var lanes   := EscapeBehavior.get_hit_lanes(offsets, 3, 5)
+	assert_eq(lanes, [3], "fallback [0] → seule la lane d'évasion est touchée")
+
+# ── Intégration MONSTER_DEFS : champ damage_on_escape ─────────────
+
+func test_standard_goblins_hit_single_lane() -> void:
+	for mid in ["g", "b", "r"]:
+		var offsets : Array = GameData.MONSTER_DEFS[mid]["escape_behavior"]["damage_on_escape"]["lane_offsets"]
+		assert_eq(offsets, [0], "gobelin '%s' : damage_on_escape.lane_offsets = [0]" % mid)
+
+func test_bosses_hit_three_lanes() -> void:
+	for boss_id in ["boss_g", "boss_b", "boss_r"]:
+		var offsets : Array = GameData.MONSTER_DEFS[boss_id]["escape_behavior"]["damage_on_escape"]["lane_offsets"]
+		assert_eq(offsets, [-1, 0, 1],
+			"boss '%s' : damage_on_escape.lane_offsets = [-1, 0, 1]" % boss_id)
+
+func test_boss_hits_two_lanes_at_border() -> void:
+	# Boss en lane 0 avec [-1, 0, 1] → après get_hit_lanes : [0, 1] (2 lanes, pas 3)
+	var offsets : Array = GameData.MONSTER_DEFS["boss_g"]["escape_behavior"]["damage_on_escape"]["lane_offsets"]
+	var lanes   := EscapeBehavior.get_hit_lanes(offsets, 0, 5)
+	assert_eq(lanes.size(), 2, "boss en bord gauche → 2 lanes effectives (pas 3)")
