@@ -207,6 +207,61 @@ func death_anim_boss(pos: Vector2):
 		shake_tw.tween_property(cam, "offset", Vector2(-5, 3), 0.06)
 		shake_tw.tween_property(cam, "offset", Vector2(0, 0), 0.05)
 
+# ── Animation de dégâts d'évasion ───────────────────────────────
+# Appelée pour chaque lane touchée quand un monstre atteint le bas de sa file.
+# hit_color : couleur palette du monstre (palette["main"]).
+# Fire-and-forget : pas d'await, les tweens tournent en arrière-plan.
+func show_escape_hit(lane: int, hit_color: Color):
+	var lane_cx     := float(BoardGeometry.GRID_ORIGIN_X + lane * BoardGeometry.CELL_WIDTH + BoardGeometry.CELL_WIDTH / 2)
+	var grid_bottom := float(BoardGeometry.GRID_ORIGIN_Y + BoardGeometry.GRID_ROWS * BoardGeometry.CELL_HEIGHT)
+	var player_y    := float(BoardGeometry.PLAYER_Y)
+
+	# Trait coloré vertical (couleur monstre → rouge en bas)
+	var beam := Line2D.new()
+	beam.add_point(Vector2(lane_cx, grid_bottom))
+	beam.add_point(Vector2(lane_cx, player_y + 10.0))
+	beam.width = 7.0
+	beam.default_color = hit_color.lerp(Color(1.0, 0.15, 0.10), 0.35)
+	beam.default_color.a = 0.88
+	bg.add_child(beam)
+	var tw_beam := create_tween()
+	tw_beam.tween_property(beam, "modulate:a", 0.0, 0.20)
+	tw_beam.tween_callback(beam.queue_free)
+
+	# Flash rouge sur la zone joueur dans cette lane
+	var flash := ColorRect.new()
+	flash.size     = Vector2(BoardGeometry.CELL_WIDTH - 8, 40)
+	flash.position = Vector2(BoardGeometry.GRID_ORIGIN_X + lane * BoardGeometry.CELL_WIDTH + 4, player_y - 22.0)
+	flash.color    = Color(1.0, 0.12, 0.08, 0.80)
+	bg.add_child(flash)
+	var tw_flash := create_tween()
+	tw_flash.tween_property(flash, "modulate:a", 0.0, 0.22)
+	tw_flash.tween_callback(flash.queue_free)
+
+	# Anneau rouge expansif centré sur la position joueur
+	var ring := Line2D.new()
+	ring.width         = 3.5
+	ring.default_color = Color(1.0, 0.20, 0.10, 0.88)
+	var pts := 18
+	for i in pts + 1:
+		var angle := (float(i) / pts) * TAU
+		ring.add_point(Vector2(cos(angle), sin(angle)) * 10.0)
+	ring.position = Vector2(lane_cx, player_y)
+	bg.add_child(ring)
+	var tw_ring := create_tween()
+	tw_ring.tween_property(ring, "scale",     Vector2(3.8, 3.8), 0.30)
+	tw_ring.parallel().tween_property(ring, "modulate:a", 0.0,   0.30)
+	tw_ring.tween_callback(ring.queue_free)
+
+	# Caméra shake léger
+	var cam := get_viewport().get_camera_2d()
+	if cam:
+		var shake := create_tween()
+		shake.tween_property(cam, "offset", Vector2( 5.0,  3.0), 0.05)
+		shake.tween_property(cam, "offset", Vector2(-5.0, -2.0), 0.05)
+		shake.tween_property(cam, "offset", Vector2( 3.0, -1.0), 0.04)
+		shake.tween_property(cam, "offset", Vector2( 0.0,  0.0), 0.04)
+
 # ── Float d'or ───────────────────────────────────────────────────
 func show_gold_float(pos: Vector2, amount: int):
 	var lbl = Label.new()
