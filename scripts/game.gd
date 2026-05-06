@@ -268,15 +268,10 @@ func _do_tick():
 				var cur_hp       = m.hp
 				var def_snapshot = m._def_snapshot
 				board_state.clear_cell(r, l)
-				if m.is_boss:
-					var hit_lanes : Dictionary = {}
-					for dl in [-1, 0, 1]:
-						hit_lanes[clamp(l + dl, 0, BoardGeometry.GRID_COLUMNS - 1)] = true
-					for tl in hit_lanes:
-						if tl == player_ctrl.player_lane:
-							player_ctrl.hit(dmg)
-				else:
-					if l == player_ctrl.player_lane:
+				var dmg_cfg     : Dictionary = def_snapshot.get("escape_behavior", {}).get("damage_on_escape", {"lane_offsets": [0]})
+				var hit_lanes   : Array      = EscapeBehavior.get_hit_lanes(dmg_cfg.get("lane_offsets", [0]), l, BoardGeometry.GRID_COLUMNS)
+				for tl in hit_lanes:
+					if tl == player_ctrl.player_lane:
 						player_ctrl.hit(dmg)
 				m.queue_free()
 				_on_monster_escaped(l, mid, cur_hp, def_snapshot)
