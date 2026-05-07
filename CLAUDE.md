@@ -244,18 +244,29 @@ BoardGeometry.CELL_HEIGHT    # 56
 BoardGeometry.GRID_ORIGIN_X  # 140  — (1280 - 5*180) / 2
 BoardGeometry.GRID_ORIGIN_Y  # 115
 BoardGeometry.PLAYER_Y       # 603  — bas de grille + 40
+BoardGeometry.PLAYER_MARGIN  # 40   — marge entre bord de grille et centre joueur
 
 BoardGeometry.get_cell_center(row, col) -> Vector2
 BoardGeometry.cell_to_world(row, col)   -> Vector2
 BoardGeometry.world_to_cell(pos)        -> Vector2i
 BoardGeometry.is_valid_cell(row, col)   -> bool
+
+# Périmètre joueur (issue #77)
+BoardGeometry.get_player_perimeter_pos(side, index) -> Vector2
+# Retourne la position monde du joueur sur le périmètre extérieur.
+# side  : "bottom" | "top" | "left" | "right"
+# index : colonne (bottom/top) ou rangée (left/right)
+
+BoardGeometry.get_perimeter_max_index(side) -> int
+# Retourne l'index maximum valide pour un côté donné.
+# bottom/top → GRID_COLUMNS - 1 ; left/right → GRID_ROWS - 1
 ```
 
 **Marges verticales** (écran 1280×720, TopBar 50px, XPZone à y=668) :
 - Au-dessus de la grille (TopBar → row 0) : **65 px**
 - En dessous du joueur (PLAYER_Y → XPZone) : **65 px**
 - Sur les côtés (GRID_ORIGIN_X) : **140 px** de chaque côté
-- Ces marges sont conçues pour permettre à terme un déplacement périmétrique du joueur autour de la grille (haut / bas / gauche / droite).
+- `PLAYER_MARGIN = 40` : distance entre le bord extérieur de la grille et le centre du joueur sur chaque côté.
 
 ### Monster — classe de base
 
@@ -272,6 +283,59 @@ monster.tick_freeze()                    # appelé à chaque tick (décrémente)
 monster.on_tick()                        # hook comportement (override dans sous-classes)
 monster.apply_palette(palette)           # applique les couleurs sur les Polygon2D
 ```
+
+### Position périphérique du joueur (issue #77)
+
+Le joueur est toujours positionné sur le **périmètre extérieur** de la grille, jamais dans une cellule interne. Sa position est décrite par deux variables dans `game_player.gd` :
+
+| Variable | Type | Rôle |
+|---|---|---|
+| `player_side` | String | Côté actif : `"bottom"` \| `"top"` \| `"left"` \| `"right"` |
+| `player_edge_index` | int | Colonne (bottom/top, 0–4) ou rangée (left/right, 0–7) |
+| `player_lane` | int | Colonne effective pour armes et détection de coups (toujours dans [0, GRID_COLUMNS-1]) |
+
+**Règles de déplacement sur le bord actif :**
+- `bottom` / `top` : `lane_left` (←) et `lane_right` (→) déplacent entre les colonnes.
+- `left` / `right` : `move_up` (↑) et `move_down` (↓) déplacent entre les rangées.
+
+**Transitions de coin (sens horaire) :**
+
+| Position | Input | Destination |
+|---|---|---|
+| bottom, index=0 (coin bas-gauche) | ↑ (`move_up`) | left, index=GRID_ROWS-1 |
+| left, index=0 (coin haut-gauche) | → (`lane_right`) | top, index=0 |
+| top, index=GRID_COLUMNS-1 (coin haut-droit) | ↓ (`move_down`) | right, index=0 |
+| right, index=GRID_ROWS-1 (coin bas-droit) | ← (`lane_left`) | bottom, index=GRID_COLUMNS-1 |
+
+Tout autre input invalide pour le côté actif est neutre (pas de mouvement, pas de transition).
+
+**`player_lane` selon le côté :**
+- `bottom` / `top` → `player_lane = player_edge_index` (colonne directe)
+- `left` → `player_lane = 0`
+- `right` → `player_lane = GRID_COLUMNS - 1`
+
+Cette valeur est propagée à `game_weapons.gd` à chaque déplacement. La détection de coups (monstre qui s'échappe par `player_lane`) et la collecte de gemmes utilisent cette même valeur.
+
+**API publique `game_player.gd` :**
+```gdscript
+# Initialise le joueur sur un côté et un index donnés.
+player_ctrl.init_player(side: String, index: int, hp: int, hp_max: int)
+
+# Déplace le joueur sur le périmètre. Retourne true si mouvement effectué.
+player_ctrl.move_perimeter(action: String) -> bool
+# action : "left" | "right" | "up" | "down"
+```
+
+**Inputs mappés :**
+
+| Action Godot | Touche | Usage |
+|---|---|---|
+| `lane_left` | ← | déplacement gauche / transition bas-droit |
+| `lane_right` | → | déplacement droite / transition haut-gauche |
+| `move_up` | ↑ | déplacement haut (côtés) / transition bas-gauche |
+| `move_down` | ↓ | déplacement bas (côtés) / transition haut-droit |
+
+---
 
 ### Variables d'état (game.gd)
 
@@ -769,6 +833,8 @@ Scaling : `pow(1.5, (room - 15) / 5)` appliqué à hp, damage, xp_value au momen
 
 - `lane_left` → flèche gauche
 - `lane_right` → flèche droite
+- `move_up` → flèche haut (déplacement sur côtés + transition coin bas-gauche)
+- `move_down` → flèche bas (déplacement sur côtés + transition coin haut-droit)
 - `next_room` → ESPACE
 
 ## Support mobile / web (issue #91)
@@ -1030,7 +1096,10 @@ test/
     ├── test_board_state.gd         ← occupation de cellules, obstacles (issue #84)
     ├── test_obstacle_data.gd       ← factory, destructibles, blocage (issue #84)
     ├── test_monster_stats.gd       ← constantes, ticks, scaling boss (issue #84)
-    └── test_spawn_fallback.gd      ← resolve_spawn_ctx, find_spawn_lane (issue #84)
+    ├── test_spawn_fallback.gd      ← resolve_spawn_ctx, find_spawn_lane (issue #84)
+    ├── test_player_perimeter.gd    ← position périphérique joueur, transitions de coin (issue #77)
+    ├── test_monster_behaviors.gd   ← ObstacleBehavior.resolve(), pondéré, destroy_obstacle
+    └── test_escape_behavior.gd     ← EscapeBehavior.calc_return_hp, get_spawn_type_at, get_hit_lanes
 ```
 
 Prévoir plus tard : `test/integration/` pour les tests de scènes complètes.
@@ -1116,7 +1185,7 @@ Ce pack fournit un **filet de sécurité minimal** avant le refacto structurel p
 - **Comportement du boss** : retraite, barre de vie (dépend de la scène `monster_boss.tscn`)
 - **Tick complet de simulation** : `game.gd._do_tick()` coordonne trop de sous-systèmes
 - **HUD et records** : dépendent de scènes et de fichiers persistants
-- **Projectile orienté selon le côté actif** : le concept `player_side → forward_dir` n'est pas encore formalisé dans le code (spawner fixé en bas)
+- **Projectile orienté selon le côté actif** : `player_side` est maintenant formalisé dans `game_player.gd`, mais la direction de tir reste fixée vers le haut — le couplage armes/côté actif est prévu dans une issue ultérieure
 
 ### Comment étendre ce pack
 

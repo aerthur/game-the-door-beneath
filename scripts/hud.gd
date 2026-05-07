@@ -66,11 +66,15 @@ func _ready():
 	if not btn_menu.pressed.is_connected(_on_menu_principal_pressed):
 		btn_menu.pressed.connect(_on_menu_principal_pressed)
 
-	# Contrôles tactiles — D-pad
+	# Contrôles tactiles — D-pad (4 directions pour le périmètre joueur issue #77)
 	var btn_left  : Button = $TouchButtons/DPad/BtnLeft
 	var btn_right : Button = $TouchButtons/DPad/BtnRight
+	var btn_up    : Button = $TouchButtons/DPad/BtnUp
+	var btn_down  : Button = $TouchButtons/DPad/BtnDown
 	btn_left.button_down.connect(_on_touch_left)
 	btn_right.button_down.connect(_on_touch_right)
+	btn_up.button_down.connect(_on_touch_up)
+	btn_down.button_down.connect(_on_touch_down)
 	$PortraitWarning/Panel/VBox/Icon.add_theme_font_size_override("font_size", 80)
 	$PortraitWarning/Panel/VBox/Message.add_theme_font_size_override("font_size", 26)
 
@@ -210,6 +214,18 @@ func _on_touch_left() -> void:
 func _on_touch_right() -> void:
 	var ev := InputEventAction.new()
 	ev.action = "lane_right"
+	ev.pressed = true
+	Input.parse_input_event(ev)
+
+func _on_touch_up() -> void:
+	var ev := InputEventAction.new()
+	ev.action = "move_up"
+	ev.pressed = true
+	Input.parse_input_event(ev)
+
+func _on_touch_down() -> void:
+	var ev := InputEventAction.new()
+	ev.action = "move_down"
 	ev.pressed = true
 	Input.parse_input_event(ev)
 
@@ -577,7 +593,7 @@ func _style_dpad() -> void:
 
 	for btn_path in ["BtnLeft", "BtnRight", "BtnUp", "BtnDown"]:
 		var btn : Button = $TouchButtons/DPad.get_node(btn_path)
-		var is_active : bool = btn_path in ["BtnLeft", "BtnRight"]
+		var is_active : bool = true
 		btn.add_theme_font_size_override("font_size", 28)
 		if is_active:
 			btn.add_theme_stylebox_override("normal",   active_style)

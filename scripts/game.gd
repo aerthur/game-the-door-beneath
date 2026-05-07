@@ -59,7 +59,7 @@ func _ready():
 	player_ctrl.player_node = player_node
 	player_ctrl.hud         = hud
 	player_ctrl.weapons_ref = weapons
-	player_ctrl.init_player(2, player_hp, player_max)
+	player_ctrl.init_player("bottom", 2, player_hp, player_max)
 	player_ctrl.game_over_triggered.connect(_on_player_game_over)
 	player_ctrl.next_room_requested.connect(func(): _start_room(room_num + 1))
 	weapons.player_lane = player_ctrl.player_lane
