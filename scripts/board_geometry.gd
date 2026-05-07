@@ -28,3 +28,35 @@ static func world_to_cell(pos: Vector2) -> Vector2i:
 
 static func is_valid_cell(row: int, col: int) -> bool:
 	return row >= 0 and row < GRID_ROWS and col >= 0 and col < GRID_COLUMNS
+
+# ── Périmètre joueur ─────────────────────────────────────────────
+
+# Distance en pixels entre le bord de la grille et le centre du joueur sur chaque côté.
+const PLAYER_MARGIN = 40
+
+# Y du joueur sur le bord bas (inchangé pour la compatibilité).
+# PLAYER_Y = GRID_ORIGIN_Y + GRID_ROWS * CELL_HEIGHT + PLAYER_MARGIN = 603
+
+# Retourne la position monde du joueur positionné sur le périmètre extérieur.
+# side  : "bottom" | "top" | "left" | "right"
+# index : colonne (bottom/top) ou rangée (left/right)
+static func get_player_perimeter_pos(side: String, index: int) -> Vector2:
+	match side:
+		"bottom":
+			return Vector2(GRID_ORIGIN_X + index * CELL_WIDTH + CELL_WIDTH * 0.5, PLAYER_Y)
+		"top":
+			return Vector2(GRID_ORIGIN_X + index * CELL_WIDTH + CELL_WIDTH * 0.5,
+					GRID_ORIGIN_Y - PLAYER_MARGIN)
+		"left":
+			return Vector2(GRID_ORIGIN_X - PLAYER_MARGIN,
+					GRID_ORIGIN_Y + index * CELL_HEIGHT + CELL_HEIGHT * 0.5)
+		"right":
+			return Vector2(GRID_ORIGIN_X + GRID_COLUMNS * CELL_WIDTH + PLAYER_MARGIN,
+					GRID_ORIGIN_Y + index * CELL_HEIGHT + CELL_HEIGHT * 0.5)
+	return Vector2.ZERO
+
+# Retourne l'index maximum valide pour un côté donné.
+static func get_perimeter_max_index(side: String) -> int:
+	if side == "left" or side == "right":
+		return GRID_ROWS - 1
+	return GRID_COLUMNS - 1
