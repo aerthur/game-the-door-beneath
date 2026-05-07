@@ -228,7 +228,7 @@ offset_right = -15.0
 offset_bottom = -60.0
 mouse_filter = 2
 
-; ↑ Haut — réservé (désactivé, futur)
+; ↑ Haut — move_up (déplacement sur côtés + transition coin bas-gauche)
 [node name="BtnUp" type="Button" parent="TouchButtons/DPad"]
 anchor_left = 0.0
 anchor_top = 0.0
@@ -238,7 +238,6 @@ offset_left = 70.0
 offset_top = 0.0
 offset_right = 140.0
 offset_bottom = 70.0
-disabled = true
 text = "▲"
 
 ; ◀ Gauche
@@ -265,7 +264,7 @@ offset_right = 210.0
 offset_bottom = 140.0
 text = "▶"
 
-; ↓ Bas — réservé (désactivé, futur)
+; ↓ Bas — move_down (déplacement sur côtés + transition coin haut-droit)
 [node name="BtnDown" type="Button" parent="TouchButtons/DPad"]
 anchor_left = 0.0
 anchor_top = 0.0
@@ -275,7 +274,6 @@ offset_left = 70.0
 offset_top = 140.0
 offset_right = 140.0
 offset_bottom = 210.0
-disabled = true
 text = "▼"
 
 ; ── Avertissement portrait (mobile) ──
