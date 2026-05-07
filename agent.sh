@@ -362,13 +362,20 @@ handle_fix_issues() {
   git fetch origin 2>/dev/null || true
 
   # ── 1. PRs avec agent-fix (branche connue directement) ────────
+  # On récupère toutes les PRs ouvertes et filtre le label localement
+  # pour éviter le délai d'indexation de l'API Search GitHub.
   local PR_FIX_LIST PR_COUNT
   PR_FIX_LIST=$(gh pr list \
     --repo "$REPO" \
     --state open \
-    --label "agent-fix" \
-    --json number,title,headRefName,body \
-    --limit 5 2>/dev/null || echo "[]")
+    --json number,title,headRefName,body,labels \
+    --limit 50 2>/dev/null \
+    | python3 -c "
+import sys, json
+prs = json.load(sys.stdin)
+result = [p for p in prs if any(l['name'] == 'agent-fix' for l in p.get('labels', []))]
+print(json.dumps(result[:5]))
+" || echo "[]")
   PR_COUNT=$(echo "$PR_FIX_LIST" | python3 -c "import sys,json; print(len(json.load(sys.stdin)))")
 
   if [ "$PR_COUNT" -gt "0" ]; then
@@ -400,9 +407,14 @@ print(m.group(1) if m else '')
   ISSUE_FIX_LIST=$(gh issue list \
     --repo "$REPO" \
     --state open \
-    --label "agent-fix" \
-    --json number,title \
-    --limit 5 2>/dev/null || echo "[]")
+    --json number,title,labels \
+    --limit 50 2>/dev/null \
+    | python3 -c "
+import sys, json
+issues = json.load(sys.stdin)
+result = [{'number': i['number'], 'title': i['title']} for i in issues if any(l['name'] == 'agent-fix' for l in i.get('labels', []))]
+print(json.dumps(result[:5]))
+" || echo "[]")
   ISSUE_COUNT=$(echo "$ISSUE_FIX_LIST" | python3 -c "import sys,json; print(len(json.load(sys.stdin)))")
 
   [ "$ISSUE_COUNT" -eq "0" ] && return 0
